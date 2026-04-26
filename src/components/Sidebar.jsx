@@ -1,25 +1,25 @@
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
-import { useAuthState } from 'react-firebase-hooks/auth'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import pgConfig from '../config/pgConfig'
 
-const navItems = [
-  { label: 'Dashboard', icon: '⚡', path: '/dashboard' },
-  { label: 'Rooms', icon: '🏠', path: '/rooms' },
-  { label: 'Tenants', icon: '👥', path: '/tenants' },
-  { label: 'Bookings', icon: '📋', path: '/bookings' },
-  { label: 'Payments', icon: '💰', path: '/payments' },
-  { label: 'Expenses', icon: '🧾', path: '/expenses' },
-  { label: 'Staff', icon: '👷', path: '/staff' },
-  { label: 'Reports', icon: '📊', path: '/reports' },
-  { label: 'Assets', icon: '📦', path: '/assets' },
-  { label: 'Notifications', icon: '🔔', path: '/notifications' },
-  { label: 'Settings', icon: '⚙️', path: '/settings' },
+const allNavItems = [
+  { label: 'Dashboard', icon: '⚡', path: '/dashboard', adminOnly: false },
+  { label: 'Rooms', icon: '🏠', path: '/rooms', adminOnly: false },
+  { label: 'Tenants', icon: '👥', path: '/tenants', adminOnly: false },
+  { label: 'Bookings', icon: '📋', path: '/bookings', adminOnly: false },
+  { label: 'Payments', icon: '💰', path: '/payments', adminOnly: false },
+  { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: true },
+  { label: 'Staff', icon: '👷', path: '/staff', adminOnly: true },
+  { label: 'Reports', icon: '📊', path: '/reports', adminOnly: true },
+  { label: 'Assets', icon: '📦', path: '/assets', adminOnly: true },
+  { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false },
+  { label: 'Settings', icon: '⚙️', path: '/settings', adminOnly: true },
 ]
 
 export default function Sidebar() {
-  const [user] = useAuthState(auth)
+  const { role } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -28,13 +28,22 @@ export default function Sidebar() {
     navigate('/login')
   }
 
+  const navItems = allNavItems.filter(item => !item.adminOnly || role === 'admin')
+
   return (
     <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col fixed h-screen z-10">
-      
+
       {/* LOGO */}
       <div className="p-5 border-b border-gray-800">
         <div className="text-xl font-black bg-gradient-to-r from-indigo-400 to-pink-400 bg-clip-text text-transparent">PGMS</div>
         <div className="text-gray-600 text-xs font-mono mt-0.5">{pgConfig.pg_name}</div>
+      </div>
+
+      {/* ROLE BADGE */}
+      <div className="px-5 py-2 border-b border-gray-800">
+        <span className={`text-xs font-mono px-2 py-0.5 rounded-lg font-bold ${role === 'admin' ? 'bg-indigo-500/20 text-indigo-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+          {role === 'admin' ? '👑 Admin' : '🔑 Warden'}
+        </span>
       </div>
 
       {/* NAV */}
