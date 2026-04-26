@@ -1,0 +1,175 @@
+import { useState, useEffect } from 'react'
+import { db } from '../firebase/config'
+import { collection, onSnapshot } from 'firebase/firestore'
+import { useNavigate } from 'react-router-dom'
+import Sidebar from '../components/Sidebar'
+import BottomNav from '../components/BottomNav'
+import pgConfig from '../config/pgConfig'
+
+export default function Dashboard() {
+  const [rooms, setRooms] = useState([])
+  const [tenants, setTenants] = useState([])
+  const [payments, setPayments] = useState([])
+  const [expenses, setExpenses] = useState([])
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const unsub1 = onSnapshot(collection(db, 'rooms'), snap => setRooms(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsub2 = onSnapshot(collection(db, 'tenants'), snap => setTenants(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsub3 = onSnapshot(collection(db, 'payments'), snap => setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    const unsub4 = onSnapshot(collection(db, 'expenses'), snap => setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    return () => { unsub1(); unsub2(); unsub3(); unsub4() }
+  }, [])
+
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const occupancy = rooms.filter(r => r.status === 'occupied').length
+  const activeTenants = tenants.filter(t => t.status === 'active')
+  const totalRevenue = payments.filter(p => p.date?.startsWith(thisMonth)).reduce((s, p) => s + p.amount, 0)
+  const totalExpenses = expenses.filter(e => e.date?.startsWith(thisMonth)).reduce((s, e) => s + e.amount, 0)
+  const netProfit = totalRevenue - totalExpenses
+
+  // Recent payments
+  const recentPayments = [...payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
+
+  // Status colors
+  const statusColors = {
+    vacant: 'bg-green-500/10 border-green-500/30 text-green-400',
+    occupied: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400',
+    maintenance: 'bg-red-500/10 border-red-500/30 text-red-400',
+    reserved: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+  }
+
+  const greeting = () => {
+    const h = new Date().getHours()
+    if (h < 12) return 'Good Morning'
+    if (h < 17) return 'Good Afternoon'
+    return 'Good Evening'
+  }
+
+  return (
+    <div className="flex min-h-screen bg-gray-950 text-white">
+      <div className="hidden md:block"><Sidebar /></div>
+
+      <main className="flex-1 md:ml-56 p-4 md:p-8 pb-24 md:pb-8">
+
+        {/* MOBILE TOPBAR */}
+        <div className="flex items-center justify-between mb-6 md:hidden">
+          <div>
+            <div className="text-lg font-black bg-gradient-to-r from-indigo-400 to-pink-400 bg-clip-text text-transparent">PGMS</div>
+            <div className="text-gray-600 text-xs font-mono">{pgConfig.pg_name}</div>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+            {pgConfig.owner_name[0]}
+          </div>
+        </div>
+
+        {/* GREETING */}
+        <h2 className="text-xl md:text-2xl font-bold mb-1">{greeting()}, {pgConfig.owner_name} 👋</h2>
+        <p className="text-gray-500 font-mono text-xs md:text-sm mb-6">{new Date().toDateString()} · {pgConfig.location}</p>
+
+        {/* STAT CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div onClick={() => navigate('/rooms')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-indigo-500/50 transition-all">
+            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Occupancy</p>
+            <p className="text-2xl md:text-3xl font-black text-indigo-400">{occupancy}/{pgConfig.max_rooms}</p>
+            <p className="text-gray-600 text-xs mt-1">{rooms.filter(r => r.status === 'vacant').length} vacant</p>
+          </div>
+          <div onClick={() => navigate('/payments')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-green-500/50 transition-all">
+            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Revenue</p>
+            <p className="text-2xl md:text-3xl font-black text-green-400">{pgConfig.currency}{totalRevenue.toLocaleString()}</p>
+            <p className="text-gray-600 text-xs mt-1">this month</p>
+          </div>
+          <div onClick={() => navigate('/expenses')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-red-500/50 transition-all">
+            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Expenses</p>
+            <p className="text-2xl md:text-3xl font-black text-red-400">{pgConfig.currency}{totalExpenses.toLocaleString()}</p>
+            <p className="text-gray-600 text-xs mt-1">this month</p>
+          </div>
+          <div onClick={() => navigate('/reports')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-yellow-500/50 transition-all">
+            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Net Profit</p>
+            <p className={`text-2xl md:text-3xl font-black ${netProfit >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>{pgConfig.currency}{netProfit.toLocaleString()}</p>
+            <p className="text-gray-600 text-xs mt-1">this month</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+
+          {/* ROOM MAP */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold">Room Map</h3>
+              <button onClick={() => navigate('/rooms')} className="text-indigo-400 text-xs font-mono">Manage →</button>
+            </div>
+            {rooms.length === 0 ? (
+              <p className="text-gray-600 text-sm font-mono text-center py-6">No rooms added yet</p>
+            ) : (
+              <div className="grid grid-cols-5 gap-2">
+                {rooms.map(room => (
+                  <div key={room.id} className={`border rounded-lg p-2 text-center cursor-pointer hover:scale-105 transition-all ${statusColors[room.status]}`}>
+                    <div className="font-black text-sm">{room.number}</div>
+                    <div className="text-xs opacity-70 truncate">{room.status === 'occupied' ? '●' : room.status === 'vacant' ? '○' : room.status === 'maintenance' ? '✕' : '◎'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-3 mt-3 flex-wrap">
+              {['occupied', 'vacant', 'maintenance', 'reserved'].map(s => (
+                <div key={s} className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${s === 'occupied' ? 'bg-indigo-400' : s === 'vacant' ? 'bg-green-400' : s === 'maintenance' ? 'bg-red-400' : 'bg-yellow-400'}`}></div>
+                  <span className="text-xs text-gray-600 font-mono capitalize">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* RECENT PAYMENTS */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold">Recent Payments</h3>
+              <button onClick={() => navigate('/payments')} className="text-indigo-400 text-xs font-mono">All →</button>
+            </div>
+            {recentPayments.length === 0 ? (
+              <p className="text-gray-600 text-sm font-mono text-center py-6">No payments yet</p>
+            ) : (
+              <div className="space-y-3">
+                {recentPayments.map(p => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-black text-sm flex-shrink-0">
+                      {p.tenantName?.[0]}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-bold">{p.tenantName}</div>
+                      <div className="text-xs text-gray-500 font-mono">Room {p.roomNumber} · {p.date}</div>
+                    </div>
+                    <div className="font-black text-green-400 text-sm">{pgConfig.currency}{p.amount?.toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* QUICK ACTIONS */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+          <h3 className="font-bold mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: '📋', label: 'New Booking', desc: 'Add tenant', path: '/tenants' },
+              { icon: '💰', label: 'Record Payment', desc: 'Cash/UPI/Bank', path: '/payments' },
+              { icon: '🧾', label: 'Add Expense', desc: 'Log a bill', path: '/expenses' },
+              { icon: '📊', label: 'View Reports', desc: 'P&L graphs', path: '/reports' },
+            ].map(action => (
+              <button key={action.path} onClick={() => navigate(action.path)}
+                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-indigo-500/50 rounded-xl p-4 text-left transition-all">
+                <div className="text-2xl mb-2">{action.icon}</div>
+                <div className="font-bold text-sm">{action.label}</div>
+                <div className="text-gray-500 text-xs font-mono">{action.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+      </main>
+      <BottomNav />
+    </div>
+  )
+}
