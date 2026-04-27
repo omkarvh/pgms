@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
 import pgConfig from '../config/pgConfig'
 import { useAuth } from '../context/AuthContext'
+import { requestDelete } from '../firebase/deleteRequests'
 
 const categories = ['Electricity', 'Water', 'Salary', 'Repairs', 'Groceries', 'Internet', 'Maintenance', 'Misc']
 
@@ -25,7 +26,7 @@ export default function Expenses() {
   const [showModal, setShowModal] = useState(false)
   const [filter, setFilter] = useState('all')
   const [form, setForm] = useState({
-    category: 'Electricity', amount: '', note: '',
+    category: 'Groceries', amount: '', note: '',
     date: new Date().toISOString().slice(0, 10)
   })
 
@@ -36,20 +37,6 @@ export default function Expenses() {
     return unsub
   }, [])
 
-  if (role === 'warden') return (
-    <div className="flex min-h-screen bg-gray-950 text-white">
-      <div className="hidden md:block"><Sidebar /></div>
-      <main className="flex-1 md:ml-56 flex items-center justify-center px-4">
-        <div className="bg-gray-900 border border-red-900 rounded-2xl p-8 text-center max-w-sm">
-          <div className="text-4xl mb-4">🚫</div>
-          <h2 className="text-white font-bold text-lg mb-2">Access Denied</h2>
-          <p className="text-gray-500 text-sm font-mono">You don't have permission to view expenses.</p>
-        </div>
-      </main>
-      <BottomNav />
-    </div>
-  )
-
   const handleSave = async () => {
     if (!form.amount) return alert('Amount is required')
     await addDoc(collection(db, 'expenses'), {
@@ -57,14 +44,19 @@ export default function Expenses() {
       amount: Number(form.amount),
       note: form.note,
       date: form.date,
+      addedBy: role,
       createdAt: new Date().toISOString()
     })
     setShowModal(false)
-    setForm({ category: 'Electricity', amount: '', note: '', date: new Date().toISOString().slice(0, 10) })
+    setForm({ category: 'Groceries', amount: '', note: '', date: new Date().toISOString().slice(0, 10) })
   }
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Delete this expense?')) await deleteDoc(doc(db, 'expenses', id))
+  const handleDelete = async (expense) => {
+    if (role === 'admin') {
+      if (window.confirm('Delete this expense?')) await deleteDoc(doc(db, 'expenses', expense.id))
+    } else {
+      await requestDelete('expenses', expense.id, `${expense.category} - ${pgConfig.currency}${expense.amount}`)
+    }
   }
 
   const thisMonth = new Date().toISOString().slice(0, 7)
@@ -93,6 +85,13 @@ export default function Expenses() {
             + Add Expense
           </button>
         </div>
+
+        {/* WARDEN NOTE */}
+        {role === 'warden' && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-4 text-yellow-400 text-xs font-mono">
+            ⚠️ You can add expenses. To delete, send a request to admin.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -140,10 +139,17 @@ export default function Expenses() {
                   <div className="font-bold text-sm">{expense.category}</div>
                   <div className="text-gray-500 text-xs font-mono">{expense.date}</div>
                   {expense.note && <div className="text-gray-600 text-xs mt-0.5">{expense.note}</div>}
+                  {expense.addedBy && <div className="text-gray-700 text-xs font-mono">by {expense.addedBy}</div>}
                 </div>
                 <div className="text-right flex items-center gap-3">
                   <div className="font-black text-red-400">{pgConfig.currency}{expense.amount.toLocaleString()}</div>
-                  <button onClick={() => handleDelete(expense.id)} className="text-gray-600 hover:text-red-400 text-xs transition-all">✕</button>
+                  <button
+                    onClick={() => handleDelete(expense)}
+                    className={`text-xs transition-all ${role === 'admin' ? 'text-gray-600 hover:text-red-400' : 'text-yellow-600 hover:text-yellow-400'}`}
+                    title={role === 'admin' ? 'Delete' : 'Request Delete'}
+                  >
+                    {role === 'admin' ? '✕' : '⚑'}
+                  </button>
                 </div>
               </div>
             ))}

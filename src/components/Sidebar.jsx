@@ -10,14 +10,14 @@ const allNavItems = [
   { label: 'Tenants', icon: '👥', path: '/tenants', adminOnly: false },
   { label: 'Bookings', icon: '📋', path: '/bookings', adminOnly: false },
   { label: 'Payments', icon: '💰', path: '/payments', adminOnly: false },
-  { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: true },
+  { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: false },
   { label: 'Staff', icon: '👷', path: '/staff', adminOnly: true },
   { label: 'Reports', icon: '📊', path: '/reports', adminOnly: true },
   { label: 'Assets', icon: '📦', path: '/assets', adminOnly: true },
   { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false },
+  { label: 'Delete Requests', icon: '🗑️', path: '/delete-requests', adminOnly: true },
   { label: 'Settings', icon: '⚙️', path: '/settings', adminOnly: true },
 ]
-
 export default function Sidebar() {
   const { role } = useAuth()
   const navigate = useNavigate()
