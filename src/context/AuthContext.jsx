@@ -13,15 +13,22 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Check role in Firestore
-        const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email))
-        const snap = await getDocs(q)
-        if (!snap.empty) {
-          const userData = snap.docs[0].data()
-          setRole(userData.role)
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email.toLowerCase().trim()))
+          const snap = await getDocs(q)
+          console.log('User email:', firebaseUser.email)
+          console.log('Docs found:', snap.size)
+          if (!snap.empty) {
+            const userData = snap.docs[0].data()
+            console.log('Role found:', userData.role)
+            setRole(userData.role)
+          } else {
+            console.log('No matching user doc found — denied')
+            setRole('denied')
+          }
           setUser(firebaseUser)
-        } else {
-          // Email not in users collection — deny access
+        } catch (err) {
+          console.error('Error fetching role:', err)
           setRole('denied')
           setUser(firebaseUser)
         }

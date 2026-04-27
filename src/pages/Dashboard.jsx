@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
 import pgConfig from '../config/pgConfig'
+import { useAuth } from '../context/AuthContext'
 
 export default function Dashboard() {
   const [rooms, setRooms] = useState([])
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [payments, setPayments] = useState([])
   const [expenses, setExpenses] = useState([])
   const navigate = useNavigate()
+  const { role } = useAuth()
 
   useEffect(() => {
     const unsub1 = onSnapshot(collection(db, 'rooms'), snap => setRooms(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
@@ -28,10 +30,8 @@ export default function Dashboard() {
   const totalExpenses = expenses.filter(e => e.date?.startsWith(thisMonth)).reduce((s, e) => s + e.amount, 0)
   const netProfit = totalRevenue - totalExpenses
 
-  // Recent payments
   const recentPayments = [...payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5)
 
-  // Status colors
   const statusColors = {
     vacant: 'bg-green-500/10 border-green-500/30 text-green-400',
     occupied: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400',
@@ -46,6 +46,15 @@ export default function Dashboard() {
     return 'Good Evening'
   }
 
+  const quickActions = [
+    { icon: '📋', label: 'New Booking', desc: 'Add tenant', path: '/tenants' },
+    { icon: '💰', label: 'Record Payment', desc: 'Cash/UPI/Bank', path: '/payments' },
+    ...(role === 'admin' ? [
+      { icon: '🧾', label: 'Add Expense', desc: 'Log a bill', path: '/expenses' },
+      { icon: '📊', label: 'View Reports', desc: 'P&L graphs', path: '/reports' },
+    ] : []),
+  ]
+
   return (
     <div className="flex min-h-screen bg-gray-950 text-white">
       <div className="hidden md:block"><Sidebar /></div>
@@ -59,12 +68,14 @@ export default function Dashboard() {
             <div className="text-gray-600 text-xs font-mono">{pgConfig.pg_name}</div>
           </div>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
-            {pgConfig.owner_name[0]}
+            {role === 'admin' ? pgConfig.owner_name[0] : 'W'}
           </div>
         </div>
 
         {/* GREETING */}
-        <h2 className="text-xl md:text-2xl font-bold mb-1">{greeting()}, {pgConfig.owner_name} 👋</h2>
+        <h2 className="text-xl md:text-2xl font-bold mb-1">
+          {greeting()}, {role === 'admin' ? pgConfig.owner_name : 'Warden'} 👋
+        </h2>
         <p className="text-gray-500 font-mono text-xs md:text-sm mb-6">{new Date().toDateString()} · {pgConfig.location}</p>
 
         {/* STAT CARDS */}
@@ -79,16 +90,34 @@ export default function Dashboard() {
             <p className="text-2xl md:text-3xl font-black text-green-400">{pgConfig.currency}{totalRevenue.toLocaleString()}</p>
             <p className="text-gray-600 text-xs mt-1">this month</p>
           </div>
-          <div onClick={() => navigate('/expenses')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-red-500/50 transition-all">
-            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Expenses</p>
-            <p className="text-2xl md:text-3xl font-black text-red-400">{pgConfig.currency}{totalExpenses.toLocaleString()}</p>
-            <p className="text-gray-600 text-xs mt-1">this month</p>
-          </div>
-          <div onClick={() => navigate('/reports')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-yellow-500/50 transition-all">
-            <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Net Profit</p>
-            <p className={`text-2xl md:text-3xl font-black ${netProfit >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>{pgConfig.currency}{netProfit.toLocaleString()}</p>
-            <p className="text-gray-600 text-xs mt-1">this month</p>
-          </div>
+          {role === 'admin' && (
+            <div onClick={() => navigate('/expenses')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-red-500/50 transition-all">
+              <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Expenses</p>
+              <p className="text-2xl md:text-3xl font-black text-red-400">{pgConfig.currency}{totalExpenses.toLocaleString()}</p>
+              <p className="text-gray-600 text-xs mt-1">this month</p>
+            </div>
+          )}
+          {role === 'admin' && (
+            <div onClick={() => navigate('/reports')} className="bg-gray-900 border border-gray-800 rounded-xl p-4 cursor-pointer hover:border-yellow-500/50 transition-all">
+              <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Net Profit</p>
+              <p className={`text-2xl md:text-3xl font-black ${netProfit >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>{pgConfig.currency}{netProfit.toLocaleString()}</p>
+              <p className="text-gray-600 text-xs mt-1">this month</p>
+            </div>
+          )}
+          {role === 'warden' && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Active Tenants</p>
+              <p className="text-2xl md:text-3xl font-black text-green-400">{activeTenants.length}</p>
+              <p className="text-gray-600 text-xs mt-1">currently staying</p>
+            </div>
+          )}
+          {role === 'warden' && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-500 text-xs font-mono uppercase tracking-widest mb-2">Vacant Rooms</p>
+              <p className="text-2xl md:text-3xl font-black text-yellow-400">{rooms.filter(r => r.status === 'vacant').length}</p>
+              <p className="text-gray-600 text-xs mt-1">available now</p>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -106,7 +135,7 @@ export default function Dashboard() {
                 {rooms.map(room => (
                   <div key={room.id} className={`border rounded-lg p-2 text-center cursor-pointer hover:scale-105 transition-all ${statusColors[room.status]}`}>
                     <div className="font-black text-sm">{room.number}</div>
-                    <div className="text-xs opacity-70 truncate">{room.status === 'occupied' ? '●' : room.status === 'vacant' ? '○' : room.status === 'maintenance' ? '✕' : '◎'}</div>
+                    <div className="text-xs opacity-70">{room.status === 'occupied' ? '●' : room.status === 'vacant' ? '○' : room.status === 'maintenance' ? '✕' : '◎'}</div>
                   </div>
                 ))}
               </div>
@@ -152,12 +181,7 @@ export default function Dashboard() {
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
           <h3 className="font-bold mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { icon: '📋', label: 'New Booking', desc: 'Add tenant', path: '/tenants' },
-              { icon: '💰', label: 'Record Payment', desc: 'Cash/UPI/Bank', path: '/payments' },
-              { icon: '🧾', label: 'Add Expense', desc: 'Log a bill', path: '/expenses' },
-              { icon: '📊', label: 'View Reports', desc: 'P&L graphs', path: '/reports' },
-            ].map(action => (
+            {quickActions.map(action => (
               <button key={action.path} onClick={() => navigate(action.path)}
                 className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-indigo-500/50 rounded-xl p-4 text-left transition-all">
                 <div className="text-2xl mb-2">{action.icon}</div>
