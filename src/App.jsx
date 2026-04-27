@@ -11,6 +11,7 @@ import Reports from './pages/Reports'
 import Assets from './pages/Assets'
 import Settings from './pages/Settings'
 import DeleteRequests from './pages/DeleteRequests'
+import Notifications from './pages/Notifications'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, role, loading } = useAuth()
@@ -44,6 +45,7 @@ function App() {
         <Route path="/assets" element={<ProtectedRoute adminOnly><Assets /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="/delete-requests" element={<ProtectedRoute adminOnly><DeleteRequests /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </HashRouter>

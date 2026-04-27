@@ -4,6 +4,7 @@ import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc } from 'fireb
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
 import pgConfig from '../config/pgConfig'
+import { sendNotification } from '../firebase/notifications'
 
 export default function Tenants() {
   const [tenants, setTenants] = useState([])
@@ -66,6 +67,11 @@ export default function Tenants() {
     } else {
       await addDoc(collection(db, 'tenants'), data)
       await updateDoc(doc(db, 'rooms', form.roomId), { status: 'occupied' })
+      await sendNotification(
+        'booking',
+        '🏠 New Tenant Added',
+        `${form.name} has been added to Room ${form.roomNumber} (${form.rentMode})`
+      )
     }
     setShowModal(false)
   }

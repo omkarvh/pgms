@@ -6,6 +6,7 @@ import Sidebar from "../components/Sidebar";
 import BottomNav from "../components/BottomNav";
 import pgConfig from "../config/pgConfig";
 import { useAuth } from "../context/AuthContext";
+import { checkRentDues } from '../firebase/notifications'
 
 function DuesTracking({ tenants, payments }) {
   const thisMonth = new Date().toISOString().slice(0, 7);
@@ -66,7 +67,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { role } = useAuth();
 
-  useEffect(() => {
+ useEffect(() => {
     const unsub1 = onSnapshot(collection(db, "rooms"), (snap) =>
       setRooms(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
@@ -86,6 +87,12 @@ export default function Dashboard() {
       unsub4();
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTenants.length > 0 && payments.length >= 0) {
+      checkRentDues(activeTenants, payments)
+    }
+  }, [activeTenants.length, payments.length])
 
   const thisMonth = new Date().toISOString().slice(0, 7);
   const occupancy = rooms.filter((r) => r.status === "occupied").length;

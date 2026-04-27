@@ -6,6 +6,7 @@ import BottomNav from '../components/BottomNav'
 import pgConfig from '../config/pgConfig'
 import { useAuth } from '../context/AuthContext'
 import { requestDelete } from '../firebase/deleteRequests'
+import { sendNotification } from '../firebase/notifications'
 
 const categories = ['Electricity', 'Water', 'Salary', 'Repairs', 'Groceries', 'Internet', 'Maintenance', 'Misc']
 
@@ -47,6 +48,11 @@ export default function Expenses() {
       addedBy: role,
       createdAt: new Date().toISOString()
     })
+    await sendNotification(
+      'expense',
+      '🧾 New Expense Added',
+      `${form.category} — ₹${Number(form.amount).toLocaleString()} added by ${role}${form.note ? ` (${form.note})` : ''}`
+    )
     setShowModal(false)
     setForm({ category: 'Groceries', amount: '', note: '', date: new Date().toISOString().slice(0, 10) })
   }
