@@ -67,7 +67,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { role } = useAuth();
 
- useEffect(() => {
+  useEffect(() => {
     const unsub1 = onSnapshot(collection(db, "rooms"), (snap) =>
       setRooms(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
@@ -88,12 +88,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  useEffect(() => {
-    if (activeTenants.length > 0 && payments.length >= 0) {
-      checkRentDues(activeTenants, payments)
-    }
-  }, [activeTenants.length, payments.length])
-
   const thisMonth = new Date().toISOString().slice(0, 7);
   const occupancy = rooms.filter((r) => r.status === "occupied").length;
   const activeTenants = tenants.filter((t) => t.status === "active");
@@ -108,6 +102,13 @@ export default function Dashboard() {
   const recentPayments = [...payments]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5);
+
+  useEffect(() => {
+    const active = tenants.filter(t => t.status === 'active')
+    if (active.length > 0) {
+      checkRentDues(active, payments)
+    }
+  }, [tenants, payments])
 
   const statusColors = {
     vacant: "bg-green-500/10 border-green-500/30 text-green-400",
