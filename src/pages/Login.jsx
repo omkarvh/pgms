@@ -1,32 +1,39 @@
-import { signInWithRedirect, getRedirectResult } from 'firebase/auth'
+import { signInWithPopup } from 'firebase/auth'
 import { auth, googleProvider } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
-import { useAuthState } from 'react-firebase-hooks/auth'
 import { useEffect, useState } from 'react'
+import { useAuth } from '../context/AuthContext'
 import pgConfig from '../config/pgConfig'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [user] = useAuthState(auth)
-  const [loading, setLoading] = useState(false)
+  const { user, role, loading } = useAuth()
+  const [error, setError] = useState('')
+  const [signingIn, setSigningIn] = useState(false)
 
   useEffect(() => {
-    if (user) navigate('/dashboard')
-  }, [user])
-
-  useEffect(() => {
-    getRedirectResult(auth).catch(err => console.error(err))
-  }, [])
+    if (!loading && user && role && role !== 'denied') {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [user, role, loading])
 
   const handleLogin = async () => {
     try {
-      setLoading(true)
-      await signInWithRedirect(auth, googleProvider)
+      setSigningIn(true)
+      setError('')
+      await signInWithPopup(auth, googleProvider)
     } catch (err) {
       console.error(err)
-      setLoading(false)
+      setError('Login failed. Please try again.')
+      setSigningIn(false)
     }
   }
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white font-mono">
+      Loading...
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
@@ -36,12 +43,18 @@ export default function Login() {
         <p className="text-gray-500 text-sm font-mono mb-8">Owner Dashboard · v{pgConfig.app_version}</p>
         <button
           onClick={handleLogin}
-          disabled={loading}
+          disabled={signingIn}
           className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-bold py-3 px-6 rounded-xl hover:bg-gray-100 transition-all disabled:opacity-50"
         >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" />
-          {loading ? 'Redirecting...' : 'Sign in with Google'}
+          {signingIn ? 'Signing in...' : 'Sign in with Google'}
         </button>
+        {error && <p className="text-red-400 text-xs mt-4 font-mono">{error}</p>}
+        {role === 'denied' && (
+          <p className="text-red-400 text-xs mt-4 font-mono">
+            🚫 Your account is not authorized. Contact admin.
+          </p>
+        )}
         <p className="text-gray-600 text-xs mt-6 font-mono">Only authorized owners can access this dashboard</p>
       </div>
     </div>

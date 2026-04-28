@@ -21,16 +21,17 @@ export function AuthProvider({ children }) {
           if (!snap.empty) {
             const userData = snap.docs[0].data()
             console.log('Role found:', userData.role)
+            setUser(firebaseUser)
             setRole(userData.role)
           } else {
             console.log('No matching user doc found — denied')
+            setUser(firebaseUser)
             setRole('denied')
           }
-          setUser(firebaseUser)
         } catch (err) {
           console.error('Error fetching role:', err)
-          setRole('denied')
           setUser(firebaseUser)
+          setRole('denied')
         }
       } else {
         setUser(null)
