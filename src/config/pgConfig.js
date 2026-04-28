@@ -4,12 +4,14 @@ const pgConfig = {
   max_rooms: 15,
   currency: "₹",
   rent_modes: ["monthly", "daily"],
-  location: "Bidar, Karnataka",
+  location: "Bengaluru, Karnataka",
   contact: "",
   upi_id: "",
   cctv_enabled: false,
-  theme_color: "#6c63ff",
-  app_version: "1.0.0"
+  theme_color: "#6366f1",
+  app_version: "1.0.0",
+  cloudinary_cloud_name: "dpgnpe7bg",
+  cloudinary_upload_preset: "pgms_uploads"
 };
 
 export default pgConfig;

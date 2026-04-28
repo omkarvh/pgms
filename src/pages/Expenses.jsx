@@ -7,6 +7,7 @@ import pgConfig from '../config/pgConfig'
 import { useAuth } from '../context/AuthContext'
 import { requestDelete } from '../firebase/deleteRequests'
 import { sendNotification } from '../firebase/notifications'
+import { uploadFile } from '../firebase/uploadFile'
 
 const categories = ['Electricity', 'Water', 'Salary', 'Repairs', 'Groceries', 'Internet', 'Maintenance', 'Misc']
 
@@ -26,9 +27,11 @@ export default function Expenses() {
   const { role } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
     category: 'Groceries', amount: '', note: '',
-    date: new Date().toISOString().slice(0, 10)
+    date: new Date().toISOString().slice(0, 10),
+    attachment: null
   })
 
   useEffect(() => {
@@ -40,21 +43,32 @@ export default function Expenses() {
 
   const handleSave = async () => {
     if (!form.amount) return alert('Amount is required')
-    await addDoc(collection(db, 'expenses'), {
-      category: form.category,
-      amount: Number(form.amount),
-      note: form.note,
-      date: form.date,
-      addedBy: role,
-      createdAt: new Date().toISOString()
-    })
-    await sendNotification(
-      'expense',
-      '🧾 New Expense Added',
-      `${form.category} — ₹${Number(form.amount).toLocaleString()} added by ${role}${form.note ? ` (${form.note})` : ''}`
-    )
-    setShowModal(false)
-    setForm({ category: 'Groceries', amount: '', note: '', date: new Date().toISOString().slice(0, 10) })
+    setUploading(true)
+    try {
+      let attachmentData = null
+      if (form.attachment) {
+        attachmentData = await uploadFile(form.attachment)
+      }
+      await addDoc(collection(db, 'expenses'), {
+        category: form.category,
+        amount: Number(form.amount),
+        note: form.note,
+        date: form.date,
+        addedBy: role,
+        attachment: attachmentData,
+        createdAt: new Date().toISOString()
+      })
+      await sendNotification(
+        'expense',
+        '🧾 New Expense Added',
+        `${form.category} — ₹${Number(form.amount).toLocaleString()} added by ${role}${form.note ? ` (${form.note})` : ''}`
+      )
+      setShowModal(false)
+      setForm({ category: 'Groceries', amount: '', note: '', date: new Date().toISOString().slice(0, 10), attachment: null })
+    } catch (err) {
+      alert('Error saving expense: ' + err.message)
+    }
+    setUploading(false)
   }
 
   const handleDelete = async (expense) => {
@@ -92,7 +106,6 @@ export default function Expenses() {
           </button>
         </div>
 
-        {/* WARDEN NOTE */}
         {role === 'warden' && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-4 text-yellow-400 text-xs font-mono">
             ⚠️ You can add expenses. To delete, send a request to admin.
@@ -137,7 +150,7 @@ export default function Expenses() {
         ) : (
           <div className="space-y-3">
             {filtered.map(expense => (
-              <div key={expense.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-center gap-4">
+              <div key={expense.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex items-start gap-4">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0 ${categoryColors[expense.category]}`}>
                   {expense.category[0]}
                 </div>
@@ -146,6 +159,16 @@ export default function Expenses() {
                   <div className="text-gray-500 text-xs font-mono">{expense.date}</div>
                   {expense.note && <div className="text-gray-600 text-xs mt-0.5">{expense.note}</div>}
                   {expense.addedBy && <div className="text-gray-700 text-xs font-mono">by {expense.addedBy}</div>}
+                  {expense.attachment && (
+                    
+                      href={expense.attachment.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-400 font-mono mt-1 block hover:underline"
+                    >
+                      📎 View {expense.attachment.format?.toUpperCase()} attachment
+                    </a>
+                  )}
                 </div>
                 <div className="text-right flex items-center gap-3">
                   <div className="font-black text-red-400">{pgConfig.currency}{expense.amount.toLocaleString()}</div>
@@ -165,7 +188,7 @@ export default function Expenses() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">Add Expense</h3>
             <div className="space-y-3">
               <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
@@ -181,12 +204,26 @@ export default function Expenses() {
               <input value={form.note} onChange={e => setForm({...form, note: e.target.value})}
                 placeholder="Note (optional)"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
+              <div>
+                <label className="text-xs text-gray-500 font-mono mb-1 block">Attachment (optional — bill/receipt)</label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={e => setForm({...form, attachment: e.target.files[0]})}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-indigo-500"
+                />
+                {form.attachment && (
+                  <p className="text-xs text-green-400 font-mono mt-1">✓ {form.attachment.name}</p>
+                )}
+              </div>
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowModal(false)}
                 className="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2.5 rounded-xl transition-all">Cancel</button>
-              <button onClick={handleSave}
-                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-sm font-bold py-2.5 rounded-xl transition-all">Save Expense</button>
+              <button onClick={handleSave} disabled={uploading}
+                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50">
+                {uploading ? 'Uploading...' : 'Save Expense'}
+              </button>
             </div>
           </div>
         </div>
