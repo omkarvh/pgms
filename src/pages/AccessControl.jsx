@@ -46,12 +46,22 @@ export default function AccessControl() {
   )
 
   const togglePermission = async (userId, permKey, currentPerms) => {
-    setSaving(userId + permKey)
-    const perms = currentPerms || {}
-    const updated = { ...perms, [permKey]: !perms[permKey] }
+  setSaving(userId + permKey)
+  const perms = currentPerms || {}
+  
+  // If permissions object doesn't exist yet, initialize all as true first
+  if (!currentPerms) {
+    const initialPerms = {}
+    allPermissions.forEach(p => { initialPerms[p.key] = true })
+    initialPerms[permKey] = false
+    await updateDoc(doc(db, 'users', userId), { permissions: initialPerms })
+  } else {
+    const currentVal = perms[permKey] !== false
+    const updated = { ...perms, [permKey]: !currentVal }
     await updateDoc(doc(db, 'users', userId), { permissions: updated })
-    setSaving(null)
   }
+  setSaving(null)
+}
 
   const toggleRole = async (userId, currentRole) => {
     const newRole = currentRole === 'warden' ? 'warden' : 'warden'
