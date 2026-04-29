@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { db } from "../firebase/config";
 import { requestDelete } from "../firebase/deleteRequests";
-import { collection, addDoc, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, updateDoc, doc, getDoc } from "firebase/firestore";
 import Sidebar from "../components/Sidebar";
 import BottomNav from "../components/BottomNav";
 import pgConfig from "../config/pgConfig";
@@ -35,7 +35,6 @@ export default function Tenants() {
   const [uploading, setUploading] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
 
-  // ALL TENANTS FILTERS
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRoomType, setFilterRoomType] = useState("all");
   const [filterFromDate, setFilterFromDate] = useState("");
@@ -115,15 +114,19 @@ export default function Tenants() {
         await updateDoc(doc(db, "tenants", editTenant.id), data);
       } else {
         await addDoc(collection(db, "tenants"), data);
-        const room = rooms.find(r => r.id === form.roomId)
-        if (room) {
-          const capacity = room.capacity || typeCapacity[room.type] || 1
-          const newOccupied = (room.occupiedBeds || 0) + 1
+
+        // Fetch FRESH room data directly from Firestore
+        const roomSnap = await getDoc(doc(db, "rooms", form.roomId))
+        if (roomSnap.exists()) {
+          const roomData = roomSnap.data()
+          const capacity = roomData.capacity || typeCapacity[roomData.type] || 1
+          const newOccupied = (roomData.occupiedBeds || 0) + 1
           await updateDoc(doc(db, "rooms", form.roomId), {
             occupiedBeds: newOccupied,
-            status: newOccupied >= capacity ? 'occupied' : 'occupied'
+            status: 'occupied'
           })
         }
+
         await sendNotification("booking", "🏠 New Tenant Added", `${form.name} has been added to Room ${form.roomNumber} (${form.rentMode})`);
       }
       setShowModal(false);
@@ -135,12 +138,22 @@ export default function Tenants() {
 
   const handleCheckout = async (tenant) => {
     if (!window.confirm(`Checkout ${tenant.name}?`)) return;
-    await updateDoc(doc(db, "tenants", tenant.id), { status: "left", leftDate: new Date().toISOString() });
-    const room = rooms.find(r => r.id === tenant.roomId)
-    if (room) {
-      const newOccupied = Math.max((room.occupiedBeds || 1) - 1, 0)
-      await updateDoc(doc(db, "rooms", tenant.roomId), { occupiedBeds: newOccupied, status: newOccupied === 0 ? 'vacant' : 'occupied' })
+
+    await updateDoc(doc(db, "tenants", tenant.id), {
+      status: "left", leftDate: new Date().toISOString()
+    });
+
+    // Fetch FRESH room data directly from Firestore
+    const roomSnap = await getDoc(doc(db, "rooms", tenant.roomId))
+    if (roomSnap.exists()) {
+      const roomData = roomSnap.data()
+      const newOccupied = Math.max((roomData.occupiedBeds || 1) - 1, 0)
+      await updateDoc(doc(db, "rooms", tenant.roomId), {
+        occupiedBeds: newOccupied,
+        status: newOccupied === 0 ? 'vacant' : 'occupied'
+      })
     }
+
     await sendNotification("info", "🚪 Tenant Checked Out", `${tenant.name} has checked out from Room ${tenant.roomNumber}`);
   };
 
@@ -186,7 +199,6 @@ export default function Tenants() {
     return true
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
-  // TENANT LIST ITEM COMPONENT
   const TenantListItem = ({ tenant, showActions = true }) => {
     const isExpanded = expandedId === tenant.id
     const room = rooms.find(r => r.id === tenant.roomId)
@@ -195,12 +207,7 @@ export default function Tenants() {
     return (
       <div className={`bg-gray-900 border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-indigo-500/50' : 'border-gray-800 hover:border-gray-700'}`}>
 
-        {/* MAIN ROW */}
-        <div
-          className="flex items-center gap-3 p-4 cursor-pointer"
-          onClick={() => setExpandedId(isExpanded ? null : tenant.id)}
-        >
-          {/* PHOTO / AVATAR */}
+        <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : tenant.id)}>
           <div className="flex-shrink-0">
             {tenant.tenantPhotoData?.url ? (
               <img src={tenant.tenantPhotoData.url} alt={tenant.name}
@@ -212,7 +219,6 @@ export default function Tenants() {
             )}
           </div>
 
-          {/* BASIC INFO */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-bold text-white">{tenant.name}</span>
@@ -228,81 +234,30 @@ export default function Tenants() {
             </div>
           </div>
 
-          {/* CHEVRON */}
-          <div className={`text-gray-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
-            ▼
-          </div>
+          <div className={`text-gray-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>▼</div>
         </div>
 
-        {/* EXPANDED DETAILS */}
         {isExpanded && (
           <div className="border-t border-gray-800 p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              {/* LEFT — DETAILS */}
               <div className="space-y-2">
                 <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Personal Details</p>
-                {tenant.email && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs w-4">✉️</span>
-                    <span className="text-sm text-gray-300">{tenant.email}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-600 text-xs w-4">📞</span>
-                  <span className="text-sm text-gray-300">{tenant.phone}</span>
-                </div>
-                {tenant.address && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-600 text-xs w-4 mt-0.5">📍</span>
-                    <span className="text-sm text-gray-300">{tenant.address}</span>
-                  </div>
-                )}
-                {tenant.emergencyContact && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs w-4">🆘</span>
-                    <span className="text-sm text-gray-300">{tenant.emergencyContact}</span>
-                  </div>
-                )}
-                {tenant.idType && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs w-4">🪪</span>
-                    <span className="text-sm text-gray-300">{tenant.idType?.toUpperCase()}: {tenant.idNumber}</span>
-                  </div>
-                )}
-                {tenant.advance > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs w-4">💰</span>
-                    <span className="text-sm text-gray-300">Advance: {pgConfig.currency}{tenant.advance}</span>
-                  </div>
-                )}
+                {tenant.email && <div className="flex items-center gap-2"><span className="text-gray-600 text-xs w-4">✉️</span><span className="text-sm text-gray-300">{tenant.email}</span></div>}
+                <div className="flex items-center gap-2"><span className="text-gray-600 text-xs w-4">📞</span><span className="text-sm text-gray-300">{tenant.phone}</span></div>
+                {tenant.address && <div className="flex items-start gap-2"><span className="text-gray-600 text-xs w-4 mt-0.5">📍</span><span className="text-sm text-gray-300">{tenant.address}</span></div>}
+                {tenant.emergencyContact && <div className="flex items-center gap-2"><span className="text-gray-600 text-xs w-4">🆘</span><span className="text-sm text-gray-300">{tenant.emergencyContact}</span></div>}
+                {tenant.idType && <div className="flex items-center gap-2"><span className="text-gray-600 text-xs w-4">🪪</span><span className="text-sm text-gray-300">{tenant.idType?.toUpperCase()}: {tenant.idNumber}</span></div>}
+                {tenant.advance > 0 && <div className="flex items-center gap-2"><span className="text-gray-600 text-xs w-4">💰</span><span className="text-sm text-gray-300">Advance: {pgConfig.currency}{tenant.advance}</span></div>}
               </div>
 
-              {/* RIGHT — STAY INFO + PHOTOS */}
               <div>
                 <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Stay Info</p>
                 <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs">🏠</span>
-                    <span className="text-sm text-gray-300">Room {tenant.roomNumber} · {room?.type || ''} · {tenant.rentMode}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs">📅</span>
-                    <span className="text-sm text-gray-300">Joined: {tenant.joinDate}</span>
-                  </div>
-                  {tenant.leftDate && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-600 text-xs">🚪</span>
-                      <span className="text-sm text-gray-300">Left: {tenant.leftDate?.slice(0, 10)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 text-xs">⏱</span>
-                    <span className="text-sm text-gray-300">{days} days {tenant.status === 'active' ? '(ongoing)' : 'total'}</span>
-                  </div>
+                  <div className="flex items-center gap-2"><span className="text-gray-600 text-xs">🏠</span><span className="text-sm text-gray-300">Room {tenant.roomNumber} · {room?.type || ''} · {tenant.rentMode}</span></div>
+                  <div className="flex items-center gap-2"><span className="text-gray-600 text-xs">📅</span><span className="text-sm text-gray-300">Joined: {tenant.joinDate}</span></div>
+                  {tenant.leftDate && <div className="flex items-center gap-2"><span className="text-gray-600 text-xs">🚪</span><span className="text-sm text-gray-300">Left: {tenant.leftDate?.slice(0, 10)}</span></div>}
+                  <div className="flex items-center gap-2"><span className="text-gray-600 text-xs">⏱</span><span className="text-sm text-gray-300">{days} days {tenant.status === 'active' ? '(ongoing)' : 'total'}</span></div>
                 </div>
-
-                {/* PHOTO LINKS */}
                 <div className="flex gap-2">
                   {tenant.idPhotoData?.url && (
                     <a href={tenant.idPhotoData.url} target="_blank" rel="noopener noreferrer"
@@ -320,7 +275,6 @@ export default function Tenants() {
               </div>
             </div>
 
-            {/* ACTION BUTTONS */}
             {showActions && tab === "active" && (
               <div className="flex gap-2 mt-4 pt-4 border-t border-gray-800">
                 {role === "admin" ? (
@@ -377,7 +331,6 @@ export default function Tenants() {
           </div>
         )}
 
-        {/* TABS */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           <button onClick={() => setTab("active")}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${tab === "active" ? "bg-indigo-500 text-white" : "bg-gray-900 text-gray-500 border border-gray-800"}`}>
@@ -393,7 +346,6 @@ export default function Tenants() {
           </button>
         </div>
 
-        {/* ACTIVE / PAST TAB */}
         {(tab === "active" || tab === "left") && (
           <>
             {displayed.length === 0 ? (
@@ -411,10 +363,8 @@ export default function Tenants() {
           </>
         )}
 
-        {/* ALL RECORDS TAB */}
         {tab === "all" && (
           <div>
-            {/* FILTERS */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-4">
               <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">Filters</p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -477,7 +427,6 @@ export default function Tenants() {
         )}
       </main>
 
-      {/* ADD/EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
