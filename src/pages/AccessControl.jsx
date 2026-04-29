@@ -4,7 +4,6 @@ import { collection, onSnapshot, updateDoc, doc, deleteDoc } from 'firebase/fire
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
 import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
 
 const allPermissions = [
   { key: 'rooms_view', label: 'View Rooms', icon: '🏠' },
@@ -18,9 +17,21 @@ const allPermissions = [
   { key: 'notifications_view', label: 'View Notifications', icon: '🔔' },
 ]
 
+// Build default permissions — all true
+const defaultPermissions = () => {
+  const perms = {}
+  allPermissions.forEach(p => { perms[p.key] = true })
+  return perms
+}
+
+// Get permission value — explicit true/false only, no undefined
+const getPermValue = (permissions, key) => {
+  if (!permissions || permissions[key] === undefined) return true
+  return permissions[key] === true
+}
+
 export default function AccessControl() {
   const { role } = useAuth()
-  const navigate = useNavigate()
   const [users, setUsers] = useState([])
   const [saving, setSaving] = useState(null)
 
@@ -46,28 +57,15 @@ export default function AccessControl() {
   )
 
   const togglePermission = async (userId, permKey, currentPerms) => {
-  setSaving(userId + permKey)
-  const perms = currentPerms || {}
-  
-  // If permissions object doesn't exist yet, initialize all as true first
-  if (!currentPerms) {
-    const initialPerms = {}
-    allPermissions.forEach(p => { initialPerms[p.key] = true })
-    initialPerms[permKey] = false
-    await updateDoc(doc(db, 'users', userId), { permissions: initialPerms })
-  } else {
-    const currentVal = perms[permKey] !== false
-    const updated = { ...perms, [permKey]: !currentVal }
-    await updateDoc(doc(db, 'users', userId), { permissions: updated })
-  }
-  setSaving(null)
-}
-
-  const toggleRole = async (userId, currentRole) => {
-    const newRole = currentRole === 'warden' ? 'warden' : 'warden'
-    if (window.confirm(`Change this user's role?`)) {
-      await updateDoc(doc(db, 'users', userId), { role: newRole })
-    }
+    setSaving(userId + permKey)
+    // Start from defaults if no permissions set yet
+    const base = currentPerms ? { ...currentPerms } : defaultPermissions()
+    // Get current explicit value
+    const currentVal = base[permKey] === true || base[permKey] === undefined
+    // Flip it
+    base[permKey] = !currentVal
+    await updateDoc(doc(db, 'users', userId), { permissions: base })
+    setSaving(null)
   }
 
   const removeUser = async (userId, email) => {
@@ -122,7 +120,6 @@ export default function AccessControl() {
               {wardens.map(user => (
                 <div key={user.id} className="border border-gray-700 rounded-xl p-4">
 
-                  {/* WARDEN HEADER */}
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white font-black text-sm flex-shrink-0">
                       {user.email?.[0]?.toUpperCase()}
@@ -139,32 +136,41 @@ export default function AccessControl() {
                     </button>
                   </div>
 
-                  {/* PERMISSIONS */}
-                  <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">Permissions</p>
+                  <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-3">
+                    Permissions — click to toggle
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {allPermissions.map(perm => {
-                      const isEnabled = user.permissions?.[perm.key] !== false
+                      const isEnabled = getPermValue(user.permissions, perm.key)
                       const isSaving = saving === user.id + perm.key
                       return (
                         <div
                           key={perm.key}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer
+                          onClick={() => !isSaving && togglePermission(user.id, perm.key, user.permissions)}
+                          className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer select-none
+                            ${isSaving ? 'opacity-50' : ''}
                             ${isEnabled
                               ? 'bg-green-500/10 border-green-500/30'
-                              : 'bg-gray-800 border-gray-700'
+                              : 'bg-gray-800 border-gray-700 opacity-60'
                             }`}
-                          onClick={() => togglePermission(user.id, perm.key, user.permissions)}
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{perm.icon}</span>
                             <span className="text-xs font-semibold">{perm.label}</span>
                           </div>
-                          <div className={`w-8 h-4 rounded-full transition-all relative ${isEnabled ? 'bg-green-500' : 'bg-gray-600'}`}>
-                            <div className={`w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all ${isEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
+                          <div className={`w-10 h-5 rounded-full transition-all relative flex-shrink-0 ${isEnabled ? 'bg-green-500' : 'bg-gray-600'}`}>
+                            <div className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all shadow ${isEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
                           </div>
                         </div>
                       )
                     })}
+                  </div>
+
+                  {/* PERMISSION SUMMARY */}
+                  <div className="mt-3 p-2 bg-gray-900 rounded-lg">
+                    <p className="text-xs font-mono text-gray-600">
+                      {allPermissions.filter(p => getPermValue(user.permissions, p.key)).length}/{allPermissions.length} permissions enabled
+                    </p>
                   </div>
                 </div>
               ))}
