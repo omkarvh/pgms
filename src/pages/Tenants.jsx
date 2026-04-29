@@ -11,6 +11,20 @@ import { uploadFile } from "../firebase/uploadFile";
 
 const typeCapacity = { single: 1, double: 2, triple: 3, dormitory: 6 }
 
+const avatarColors = [
+  'from-indigo-500 to-purple-500',
+  'from-pink-500 to-rose-500',
+  'from-green-500 to-teal-500',
+  'from-yellow-500 to-orange-500',
+  'from-blue-500 to-cyan-500',
+  'from-red-500 to-pink-500',
+]
+
+const getAvatarColor = (name) => {
+  const index = name?.charCodeAt(0) % avatarColors.length
+  return avatarColors[index] || avatarColors[0]
+}
+
 export default function Tenants() {
   const { role } = useAuth();
   const [tenants, setTenants] = useState([]);
@@ -19,6 +33,7 @@ export default function Tenants() {
   const [editTenant, setEditTenant] = useState(null);
   const [tab, setTab] = useState("active");
   const [uploading, setUploading] = useState(false);
+  const [expandedId, setExpandedId] = useState(null);
 
   // ALL TENANTS FILTERS
   const [filterStatus, setFilterStatus] = useState("all");
@@ -83,7 +98,6 @@ export default function Tenants() {
     try {
       let idPhotoData = editTenant?.idPhotoData || null
       let tenantPhotoData = editTenant?.tenantPhotoData || null
-
       if (form.idPhoto) idPhotoData = await uploadFile(form.idPhoto)
       if (form.tenantPhoto) tenantPhotoData = await uploadFile(form.tenantPhoto)
 
@@ -93,8 +107,7 @@ export default function Tenants() {
         rentMode: form.rentMode, joinDate: form.joinDate,
         idType: form.idType, idNumber: form.idNumber,
         advance: Number(form.advance), emergencyContact: form.emergencyContact,
-        address: form.address,
-        idPhotoData, tenantPhotoData,
+        address: form.address, idPhotoData, tenantPhotoData,
         status: "active", createdAt: new Date().toISOString(),
       };
 
@@ -140,18 +153,11 @@ export default function Tenants() {
 
   const downloadCSV = () => {
     const rows = filteredAll.map(t => ({
-      Name: t.name,
-      Phone: t.phone,
-      Email: t.email || '',
-      Address: t.address || '',
-      Room: t.roomNumber,
-      RentMode: t.rentMode,
-      IDType: t.idType || '',
-      IDNumber: t.idNumber || '',
-      JoinDate: t.joinDate,
-      LeftDate: t.leftDate?.slice(0, 10) || '',
-      DaysStayed: getDaysStayed(t),
-      Status: t.status,
+      Name: t.name, Phone: t.phone, Email: t.email || '',
+      Address: t.address || '', Room: t.roomNumber, RentMode: t.rentMode,
+      IDType: t.idType || '', IDNumber: t.idNumber || '',
+      JoinDate: t.joinDate, LeftDate: t.leftDate?.slice(0, 10) || '',
+      DaysStayed: getDaysStayed(t), Status: t.status,
       EmergencyContact: t.emergencyContact || ''
     }))
     const headers = Object.keys(rows[0])
@@ -160,15 +166,14 @@ export default function Tenants() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `tenants-record-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `tenants-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
 
   const activeTenants = tenants.filter((t) => t.status === "active");
   const leftTenants = tenants.filter((t) => t.status === "left");
-  const displayed = tab === "active" ? activeTenants : tab === "left" ? leftTenants : [];
+  const displayed = tab === "active" ? activeTenants : leftTenants;
 
-  // ALL TENANTS FILTER
   const filteredAll = tenants.filter(t => {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false
     if (filterRoomType !== 'all') {
@@ -180,6 +185,174 @@ export default function Tenants() {
     if (searchName && !t.name?.toLowerCase().includes(searchName.toLowerCase())) return false
     return true
   }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+  // TENANT LIST ITEM COMPONENT
+  const TenantListItem = ({ tenant, showActions = true }) => {
+    const isExpanded = expandedId === tenant.id
+    const room = rooms.find(r => r.id === tenant.roomId)
+    const days = getDaysStayed(tenant)
+
+    return (
+      <div className={`bg-gray-900 border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-indigo-500/50' : 'border-gray-800 hover:border-gray-700'}`}>
+
+        {/* MAIN ROW */}
+        <div
+          className="flex items-center gap-3 p-4 cursor-pointer"
+          onClick={() => setExpandedId(isExpanded ? null : tenant.id)}
+        >
+          {/* PHOTO / AVATAR */}
+          <div className="flex-shrink-0">
+            {tenant.tenantPhotoData?.url ? (
+              <img src={tenant.tenantPhotoData.url} alt={tenant.name}
+                className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500/40" />
+            ) : (
+              <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getAvatarColor(tenant.name)} flex items-center justify-center text-white font-black text-xl border-2 border-white/10`}>
+                {tenant.name[0]}
+              </div>
+            )}
+          </div>
+
+          {/* BASIC INFO */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white">{tenant.name}</span>
+              <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${tenant.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
+                {tenant.status === 'active' ? '● Active' : '○ Left'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+              <span className="text-xs text-gray-500 font-mono">🏠 Room {tenant.roomNumber}</span>
+              <span className="text-xs text-gray-500 font-mono">📞 {tenant.phone}</span>
+              <span className="text-xs text-gray-500 font-mono capitalize">💳 {tenant.rentMode}</span>
+              <span className="text-xs text-gray-600 font-mono">⏱ {days}d</span>
+            </div>
+          </div>
+
+          {/* CHEVRON */}
+          <div className={`text-gray-600 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}>
+            ▼
+          </div>
+        </div>
+
+        {/* EXPANDED DETAILS */}
+        {isExpanded && (
+          <div className="border-t border-gray-800 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* LEFT — DETAILS */}
+              <div className="space-y-2">
+                <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Personal Details</p>
+                {tenant.email && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs w-4">✉️</span>
+                    <span className="text-sm text-gray-300">{tenant.email}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 text-xs w-4">📞</span>
+                  <span className="text-sm text-gray-300">{tenant.phone}</span>
+                </div>
+                {tenant.address && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-600 text-xs w-4 mt-0.5">📍</span>
+                    <span className="text-sm text-gray-300">{tenant.address}</span>
+                  </div>
+                )}
+                {tenant.emergencyContact && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs w-4">🆘</span>
+                    <span className="text-sm text-gray-300">{tenant.emergencyContact}</span>
+                  </div>
+                )}
+                {tenant.idType && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs w-4">🪪</span>
+                    <span className="text-sm text-gray-300">{tenant.idType?.toUpperCase()}: {tenant.idNumber}</span>
+                  </div>
+                )}
+                {tenant.advance > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs w-4">💰</span>
+                    <span className="text-sm text-gray-300">Advance: {pgConfig.currency}{tenant.advance}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* RIGHT — STAY INFO + PHOTOS */}
+              <div>
+                <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Stay Info</p>
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs">🏠</span>
+                    <span className="text-sm text-gray-300">Room {tenant.roomNumber} · {room?.type || ''} · {tenant.rentMode}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs">📅</span>
+                    <span className="text-sm text-gray-300">Joined: {tenant.joinDate}</span>
+                  </div>
+                  {tenant.leftDate && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600 text-xs">🚪</span>
+                      <span className="text-sm text-gray-300">Left: {tenant.leftDate?.slice(0, 10)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 text-xs">⏱</span>
+                    <span className="text-sm text-gray-300">{days} days {tenant.status === 'active' ? '(ongoing)' : 'total'}</span>
+                  </div>
+                </div>
+
+                {/* PHOTO LINKS */}
+                <div className="flex gap-2">
+                  {tenant.idPhotoData?.url && (
+                    <a href={tenant.idPhotoData.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-xs px-3 py-1.5 rounded-lg transition-all">
+                      🪪 View ID
+                    </a>
+                  )}
+                  {tenant.tenantPhotoData?.url && (
+                    <a href={tenant.tenantPhotoData.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-xs px-3 py-1.5 rounded-lg transition-all">
+                      📷 View Photo
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ACTION BUTTONS */}
+            {showActions && tab === "active" && (
+              <div className="flex gap-2 mt-4 pt-4 border-t border-gray-800">
+                {role === "admin" ? (
+                  <button onClick={() => { openEdit(tenant); setExpandedId(null) }}
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 text-xs py-2 rounded-lg transition-all font-semibold">
+                    ✏️ Edit
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      const message = window.prompt(`What needs to be changed for ${tenant.name}?\n\nDescribe the change clearly:`);
+                      if (message?.trim()) {
+                        requestDelete("tenants_edit", tenant.id, `Edit request — ${tenant.name} (Room ${tenant.roomNumber}): ${message.trim()}`)
+                          .then(() => alert("Edit request sent to admin!"));
+                      }
+                    }}
+                    className="flex-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs py-2 rounded-lg transition-all font-semibold"
+                  >
+                    📝 Request Edit
+                  </button>
+                )}
+                <button onClick={() => handleCheckout(tenant)}
+                  className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs py-2 rounded-lg transition-all font-semibold">
+                  🚪 Checkout
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-950 text-white">
@@ -200,7 +373,7 @@ export default function Tenants() {
 
         {role === "warden" && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 mb-4 text-yellow-400 text-xs font-mono">
-            🔑 Warden — you can add tenants and checkout. To edit tenant details, send a request to admin.
+            🔑 Warden — you can add tenants and checkout. To edit details, send a request to admin.
           </div>
         )}
 
@@ -220,7 +393,25 @@ export default function Tenants() {
           </button>
         </div>
 
-        {/* ALL TENANTS TAB */}
+        {/* ACTIVE / PAST TAB */}
+        {(tab === "active" || tab === "left") && (
+          <>
+            {displayed.length === 0 ? (
+              <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+                <p className="text-4xl mb-3">👥</p>
+                <p className="text-gray-400 font-mono text-sm">No {tab} tenants yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {displayed.map(tenant => (
+                  <TenantListItem key={tenant.id} tenant={tenant} showActions={true} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ALL RECORDS TAB */}
         {tab === "all" && (
           <div>
             {/* FILTERS */}
@@ -245,12 +436,12 @@ export default function Tenants() {
                   <option value="dormitory">Dormitory</option>
                 </select>
                 <div>
-                  <label className="text-xs text-gray-500 font-mono mb-1 block">Join Date From</label>
+                  <label className="text-xs text-gray-500 font-mono mb-1 block">From Date</label>
                   <input type="date" value={filterFromDate} onChange={e => setFilterFromDate(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 font-mono mb-1 block">Join Date To</label>
+                  <label className="text-xs text-gray-500 font-mono mb-1 block">To Date</label>
                   <input type="date" value={filterToDate} onChange={e => setFilterToDate(e.target.value)}
                     className="w-full bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500" />
                 </div>
@@ -263,7 +454,6 @@ export default function Tenants() {
               </div>
             </div>
 
-            {/* DOWNLOAD */}
             <div className="flex justify-between items-center mb-4">
               <p className="text-gray-500 text-xs font-mono">{filteredAll.length} records found</p>
               <button onClick={downloadCSV} className="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">
@@ -271,154 +461,23 @@ export default function Tenants() {
               </button>
             </div>
 
-            {/* ALL TENANTS TABLE */}
             {filteredAll.length === 0 ? (
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
                 <p className="text-4xl mb-3">🔍</p>
                 <p className="text-gray-400 font-mono text-sm">No records match your filters.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredAll.map(tenant => {
-                  const room = rooms.find(r => r.id === tenant.roomId)
-                  const days = getDaysStayed(tenant)
-                  return (
-                    <div key={tenant.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-                      <div className="flex items-start gap-3">
-                        {/* PHOTO */}
-                        <div className="flex-shrink-0">
-                          {tenant.tenantPhotoData?.url ? (
-                            <img src={tenant.tenantPhotoData.url} alt={tenant.name}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-indigo-500/30" />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white font-black text-lg">
-                              {tenant.name[0]}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            <span className="font-bold">{tenant.name}</span>
-                            <span className={`text-xs font-mono px-2 py-0.5 rounded-lg ${tenant.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-400'}`}>
-                              {tenant.status === 'active' ? '● Active' : '○ Left'}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1">
-                            <p className="text-xs text-gray-500">📞 {tenant.phone}</p>
-                            <p className="text-xs text-gray-500">🏠 Room {tenant.roomNumber} · {room?.type || ''}</p>
-                            <p className="text-xs text-gray-500">📅 Joined: {tenant.joinDate}</p>
-                            <p className="text-xs text-gray-500">⏱ {days} days stayed</p>
-                            {tenant.address && <p className="text-xs text-gray-500 col-span-2">📍 {tenant.address}</p>}
-                            {tenant.idType && <p className="text-xs text-gray-500">🪪 {tenant.idType?.toUpperCase()}: {tenant.idNumber}</p>}
-                            {tenant.leftDate && <p className="text-xs text-gray-500">🚪 Left: {tenant.leftDate?.slice(0, 10)}</p>}
-                            {tenant.emergencyContact && <p className="text-xs text-gray-500">🆘 {tenant.emergencyContact}</p>}
-                          </div>
-
-                          {/* PHOTOS */}
-                          <div className="flex gap-2 mt-2">
-                            {tenant.idPhotoData?.url && (
-                              <a href={tenant.idPhotoData.url} target="_blank" rel="noopener noreferrer"
-                                className="text-xs text-indigo-400 hover:underline font-mono">
-                                🪪 View ID
-                              </a>
-                            )}
-                            {tenant.tenantPhotoData?.url && (
-                              <a href={tenant.tenantPhotoData.url} target="_blank" rel="noopener noreferrer"
-                                className="text-xs text-indigo-400 hover:underline font-mono">
-                                📷 View Photo
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className="space-y-2">
+                {filteredAll.map(tenant => (
+                  <TenantListItem key={tenant.id} tenant={tenant} showActions={false} />
+                ))}
               </div>
             )}
           </div>
         )}
-
-        {/* ACTIVE / PAST TABS */}
-        {(tab === "active" || tab === "left") && (
-          <>
-            {displayed.length === 0 ? (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
-                <p className="text-4xl mb-3">👥</p>
-                <p className="text-gray-400 font-mono text-sm">No {tab} tenants yet.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayed.map((tenant) => (
-                  <div key={tenant.id} className="bg-gray-900 border border-gray-800 rounded-xl p-5 hover:border-indigo-500/50 transition-all">
-                    <div className="flex items-center gap-3 mb-3">
-                      {tenant.tenantPhotoData?.url ? (
-                        <img src={tenant.tenantPhotoData.url} alt={tenant.name}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-indigo-500/30 flex-shrink-0" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center text-white font-black text-lg flex-shrink-0">
-                          {tenant.name[0]}
-                        </div>
-                      )}
-                      <div>
-                        <div className="font-bold">{tenant.name}</div>
-                        <div className="text-gray-500 text-xs font-mono">Room {tenant.roomNumber} · {tenant.rentMode}</div>
-                      </div>
-                    </div>
-                    <div className="space-y-1 mb-4">
-                      <p className="text-xs text-gray-500">📞 {tenant.phone}</p>
-                      {tenant.email && <p className="text-xs text-gray-500">✉️ {tenant.email}</p>}
-                      <p className="text-xs text-gray-500">📅 Joined: {tenant.joinDate}</p>
-                      {tenant.address && <p className="text-xs text-gray-500">📍 {tenant.address}</p>}
-                      {tenant.advance > 0 && <p className="text-xs text-gray-500">💰 Advance: {pgConfig.currency}{tenant.advance}</p>}
-                      <div className="flex gap-2 mt-1">
-                        {tenant.idPhotoData?.url && (
-                          <a href={tenant.idPhotoData.url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-indigo-400 hover:underline font-mono">🪪 ID</a>
-                        )}
-                        {tenant.tenantPhotoData?.url && (
-                          <a href={tenant.tenantPhotoData.url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs text-indigo-400 hover:underline font-mono">📷 Photo</a>
-                        )}
-                      </div>
-                    </div>
-                    {tab === "active" && (
-                      <div className="flex gap-2">
-                        {role === "admin" ? (
-                          <button onClick={() => openEdit(tenant)} className="flex-1 bg-gray-800 hover:bg-gray-700 text-xs py-1.5 rounded-lg transition-all">Edit</button>
-                        ) : (
-                          <button
-                            onClick={() => {
-                              const message = window.prompt(`What needs to be changed for ${tenant.name} (Room ${tenant.roomNumber})?\n\nDescribe the change clearly:`);
-                              if (message && message.trim()) {
-                                requestDelete("tenants_edit", tenant.id, `Edit request — ${tenant.name} (Room ${tenant.roomNumber}): ${message.trim()}`)
-                                  .then(() => alert("Edit request sent to admin successfully!"));
-                              }
-                            }}
-                            className="flex-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 text-xs py-1.5 rounded-lg transition-all"
-                          >
-                            Request Edit
-                          </button>
-                        )}
-                        <button onClick={() => handleCheckout(tenant)} className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs py-1.5 rounded-lg transition-all">
-                          Checkout
-                        </button>
-                      </div>
-                    )}
-                    {tab === "left" && (
-                      <p className="text-xs text-gray-600 font-mono">Left: {tenant.leftDate?.slice(0, 10)} · {getDaysStayed(tenant)} days stayed</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
       </main>
 
-      {/* MODAL */}
+      {/* ADD/EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
@@ -433,14 +492,12 @@ export default function Tenants() {
               <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="Home Address (optional)" rows={2}
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 resize-none" />
-
               <select value={form.roomId} onChange={handleRoomSelect}
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
                 <option value="">Select Room *</option>
                 {availableRooms.map((r) => {
                   const capacity = r.capacity || typeCapacity[r.type] || 1
-                  const occupied = r.occupiedBeds || 0
-                  const free = capacity - occupied
+                  const free = capacity - (r.occupiedBeds || 0)
                   return (
                     <option key={r.id} value={r.id}>
                       Room {r.number} · {r.type} · {free} bed{free !== 1 ? 's' : ''} free · {pgConfig.currency}{r.monthlyRate}/mo
@@ -448,7 +505,6 @@ export default function Tenants() {
                   )
                 })}
               </select>
-
               <select value={form.rentMode} onChange={(e) => setForm({ ...form, rentMode: e.target.value })}
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
                 <option value="monthly">Monthly</option>
@@ -473,22 +529,23 @@ export default function Tenants() {
                 placeholder="Emergency Contact Number"
                 className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
 
-              {/* PHOTO UPLOADS */}
               <div className="border-t border-gray-700 pt-3">
                 <p className="text-xs text-gray-500 font-mono mb-2 uppercase tracking-widest">Photos (Optional)</p>
-                <div>
-                  <label className="text-xs text-gray-500 font-mono mb-1 block">🪪 ID Photo (Aadhar/PAN front)</label>
-                  <input type="file" accept="image/*,.pdf"
-                    onChange={e => setForm({ ...form, idPhoto: e.target.files[0] })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-indigo-500" />
-                  {form.idPhoto && <p className="text-xs text-green-400 font-mono mt-1">✓ {form.idPhoto.name}</p>}
-                </div>
-                <div className="mt-2">
-                  <label className="text-xs text-gray-500 font-mono mb-1 block">📷 Tenant Photo (selfie/passport size)</label>
-                  <input type="file" accept="image/*"
-                    onChange={e => setForm({ ...form, tenantPhoto: e.target.files[0] })}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-indigo-500" />
-                  {form.tenantPhoto && <p className="text-xs text-green-400 font-mono mt-1">✓ {form.tenantPhoto.name}</p>}
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-500 font-mono mb-1 block">🪪 ID Photo (Aadhar/PAN front)</label>
+                    <input type="file" accept="image/*,.pdf"
+                      onChange={e => setForm({ ...form, idPhoto: e.target.files[0] })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-indigo-500" />
+                    {form.idPhoto && <p className="text-xs text-green-400 font-mono mt-1">✓ {form.idPhoto.name}</p>}
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-mono mb-1 block">📷 Tenant Photo (selfie/passport size)</label>
+                    <input type="file" accept="image/*"
+                      onChange={e => setForm({ ...form, tenantPhoto: e.target.files[0] })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:border-indigo-500" />
+                    {form.tenantPhoto && <p className="text-xs text-green-400 font-mono mt-1">✓ {form.tenantPhoto.name}</p>}
+                  </div>
                 </div>
               </div>
             </div>
