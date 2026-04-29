@@ -1,0 +1,1 @@
+import{_ as e,a as t,h as n,u as r}from"./AuthContext-BuhmM8QV.js";async function i(i,a,o){await r(n(t,`deleteRequests`),{collectionName:i,docId:a,label:o,status:`pending`,createdAt:e()}),alert(`Delete request sent to admin for "${o}"`)}export{i as t};
