@@ -13,6 +13,7 @@ import Settings from './pages/Settings'
 import DeleteRequests from './pages/DeleteRequests'
 import Notifications from './pages/Notifications'
 import AccessControl from './pages/AccessControl'
+import Analytics from './pages/Analytics'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, role, loading } = useAuth()
@@ -48,6 +49,7 @@ function App() {
         <Route path="/delete-requests" element={<ProtectedRoute adminOnly><DeleteRequests /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/access-control" element={<ProtectedRoute adminOnly><AccessControl /></ProtectedRoute>} />
+        <Route path="/analytics" element={<ProtectedRoute adminOnly><Analytics /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </HashRouter>

@@ -15,6 +15,7 @@ const allNavItems = [
   { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: false, permKey: 'expenses_view' },
   { label: 'Staff', icon: '👷', path: '/staff', adminOnly: true },
   { label: 'Reports', icon: '📊', path: '/reports', adminOnly: true },
+  { label: 'Analytics', icon: '📈', path: '/analytics', adminOnly: true },
   { label: 'Assets', icon: '📦', path: '/assets', adminOnly: true },
   { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false, permKey: 'notifications_view', badge: true },
   { label: 'Delete Requests', icon: '🗑️', path: '/delete-requests', adminOnly: true },
