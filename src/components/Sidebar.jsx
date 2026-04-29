@@ -18,6 +18,7 @@ const allNavItems = [
   { label: 'Assets', icon: '📦', path: '/assets', adminOnly: true },
   { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false, badge: true },
   { label: 'Delete Requests', icon: '🗑️', path: '/delete-requests', adminOnly: true },
+  { label: 'Access Control', icon: '🔐', path: '/access-control', adminOnly: true },
   { label: 'Settings', icon: '⚙️', path: '/settings', adminOnly: true },
 ]
 

@@ -29,14 +29,20 @@ export default function Expenses() {
   const [filter, setFilter] = useState('all')
   const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({
-    category: 'Groceries', amount: '', note: '',
+    category: 'Groceries',
+    amount: '',
+    note: '',
     date: new Date().toISOString().slice(0, 10),
     attachment: null
   })
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'expenses'), snap => {
-      setExpenses(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => new Date(b.date) - new Date(a.date)))
+      setExpenses(
+        snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+      )
     })
     return unsub
   }, [])
@@ -64,7 +70,13 @@ export default function Expenses() {
         `${form.category} — ₹${Number(form.amount).toLocaleString()} added by ${role}${form.note ? ` (${form.note})` : ''}`
       )
       setShowModal(false)
-      setForm({ category: 'Groceries', amount: '', note: '', date: new Date().toISOString().slice(0, 10), attachment: null })
+      setForm({
+        category: 'Groceries',
+        amount: '',
+        note: '',
+        date: new Date().toISOString().slice(0, 10),
+        attachment: null
+      })
     } catch (err) {
       alert('Error saving expense: ' + err.message)
     }
@@ -87,8 +99,24 @@ export default function Expenses() {
 
   const breakdown = categories.map(cat => ({
     cat,
-    total: thisMonthExpenses.filter(e => e.category === cat).reduce((sum, e) => sum + e.amount, 0)
+    total: thisMonthExpenses
+      .filter(e => e.category === cat)
+      .reduce((sum, e) => sum + e.amount, 0)
   })).filter(b => b.total > 0)
+
+  const AttachmentLink = ({ attachment }) => {
+    if (!attachment || !attachment.url) return null
+    return (
+      <a
+        href={attachment.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-indigo-400 font-mono mt-1 block hover:underline"
+      >
+        📎 View attachment
+      </a>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-950 text-white">
@@ -99,9 +127,14 @@ export default function Expenses() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl md:text-2xl font-bold">Expenses</h2>
-            <p className="text-gray-500 font-mono text-xs mt-0.5">This month: {pgConfig.currency}{totalThisMonth.toLocaleString()}</p>
+            <p className="text-gray-500 font-mono text-xs mt-0.5">
+              This month: {pgConfig.currency}{totalThisMonth.toLocaleString()}
+            </p>
           </div>
-          <button onClick={() => setShowModal(true)} className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl transition-all">
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-xl transition-all"
+          >
             + Add Expense
           </button>
         </div>
@@ -138,8 +171,18 @@ export default function Expenses() {
         )}
 
         <div className="flex gap-2 mb-4">
-          <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}>All</button>
-          <button onClick={() => setFilter('month')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'month' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}>This Month</button>
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilter('month')}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'month' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
+          >
+            This Month
+          </button>
         </div>
 
         {filtered.length === 0 ? (
@@ -157,21 +200,18 @@ export default function Expenses() {
                 <div className="flex-1">
                   <div className="font-bold text-sm">{expense.category}</div>
                   <div className="text-gray-500 text-xs font-mono">{expense.date}</div>
-                  {expense.note && <div className="text-gray-600 text-xs mt-0.5">{expense.note}</div>}
-                  {expense.addedBy && <div className="text-gray-700 text-xs font-mono">by {expense.addedBy}</div>}
-                  {expense.attachment && (
-                    
-                      href={expense.attachment.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-400 font-mono mt-1 block hover:underline"
-                    >
-                      📎 View {expense.attachment.format?.toUpperCase()} attachment
-                    </a>
+                  {expense.note && (
+                    <div className="text-gray-600 text-xs mt-0.5">{expense.note}</div>
                   )}
+                  {expense.addedBy && (
+                    <div className="text-gray-700 text-xs font-mono">by {expense.addedBy}</div>
+                  )}
+                  <AttachmentLink attachment={expense.attachment} />
                 </div>
                 <div className="text-right flex items-center gap-3">
-                  <div className="font-black text-red-400">{pgConfig.currency}{expense.amount.toLocaleString()}</div>
+                  <div className="font-black text-red-400">
+                    {pgConfig.currency}{expense.amount.toLocaleString()}
+                  </div>
                   <button
                     onClick={() => handleDelete(expense)}
                     className={`text-xs transition-all ${role === 'admin' ? 'text-gray-600 hover:text-red-400' : 'text-yellow-600 hover:text-yellow-400'}`}
@@ -191,21 +231,36 @@ export default function Expenses() {
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">Add Expense</h3>
             <div className="space-y-3">
-              <select value={form.category} onChange={e => setForm({...form, category: e.target.value})}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+              <select
+                value={form.category}
+                onChange={e => setForm({...form, category: e.target.value})}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+              >
                 {categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <input value={form.amount} onChange={e => setForm({...form, amount: e.target.value})}
-                placeholder="Amount (₹) *" type="number"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
-              <input value={form.date} onChange={e => setForm({...form, date: e.target.value})}
+              <input
+                value={form.amount}
+                onChange={e => setForm({...form, amount: e.target.value})}
+                placeholder="Amount (₹) *"
+                type="number"
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <input
+                value={form.date}
+                onChange={e => setForm({...form, date: e.target.value})}
                 type="date"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
-              <input value={form.note} onChange={e => setForm({...form, note: e.target.value})}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <input
+                value={form.note}
+                onChange={e => setForm({...form, note: e.target.value})}
                 placeholder="Note (optional)"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500"
+              />
               <div>
-                <label className="text-xs text-gray-500 font-mono mb-1 block">Attachment (optional — bill/receipt)</label>
+                <label className="text-xs text-gray-500 font-mono mb-1 block">
+                  Attachment (optional — bill/receipt)
+                </label>
                 <input
                   type="file"
                   accept="image/*,.pdf"
@@ -218,10 +273,17 @@ export default function Expenses() {
               </div>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowModal(false)}
-                className="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2.5 rounded-xl transition-all">Cancel</button>
-              <button onClick={handleSave} disabled={uploading}
-                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2.5 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={uploading}
+                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50"
+              >
                 {uploading ? 'Uploading...' : 'Save Expense'}
               </button>
             </div>

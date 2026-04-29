@@ -12,18 +12,12 @@ import Assets from './pages/Assets'
 import Settings from './pages/Settings'
 import DeleteRequests from './pages/DeleteRequests'
 import Notifications from './pages/Notifications'
+import AccessControl from './pages/AccessControl'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, role, loading } = useAuth()
-
-  if (loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white font-mono">
-      Loading...
-    </div>
-  )
-
+  if (loading) return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white font-mono">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
-
   if (role === 'denied') return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="bg-gray-900 border border-red-900 rounded-2xl p-8 text-center max-w-sm">
@@ -33,9 +27,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
       </div>
     </div>
   )
-
   if (adminOnly && role !== 'admin') return <Navigate to="/dashboard" replace />
-
   return children
 }
 
@@ -55,6 +47,7 @@ function App() {
         <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
         <Route path="/delete-requests" element={<ProtectedRoute adminOnly><DeleteRequests /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+        <Route path="/access-control" element={<ProtectedRoute adminOnly><AccessControl /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </HashRouter>
