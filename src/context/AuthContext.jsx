@@ -8,6 +8,7 @@ const AuthContext = createContext()
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [role, setRole] = useState(null)
+  const [permissions, setPermissions] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -16,34 +17,40 @@ export function AuthProvider({ children }) {
         try {
           const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email.toLowerCase().trim()))
           const snap = await getDocs(q)
-          console.log('User email:', firebaseUser.email)
-          console.log('Docs found:', snap.size)
           if (!snap.empty) {
             const userData = snap.docs[0].data()
-            console.log('Role found:', userData.role)
             setUser(firebaseUser)
             setRole(userData.role)
+            setPermissions(userData.permissions || {})
           } else {
-            console.log('No matching user doc found — denied')
             setUser(firebaseUser)
             setRole('denied')
+            setPermissions({})
           }
         } catch (err) {
-          console.error('Error fetching role:', err)
           setUser(firebaseUser)
           setRole('denied')
+          setPermissions({})
         }
       } else {
         setUser(null)
         setRole(null)
+        setPermissions({})
       }
       setLoading(false)
     })
     return unsub
   }, [])
 
+  // Helper to check permission
+  const hasPermission = (key) => {
+    if (role === 'admin') return true
+    if (permissions[key] === undefined) return true
+    return permissions[key] === true
+  }
+
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider value={{ user, role, permissions, hasPermission, loading }}>
       {children}
     </AuthContext.Provider>
   )

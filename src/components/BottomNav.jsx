@@ -7,7 +7,7 @@ import { db } from '../firebase/config'
 export default function BottomNav() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { role } = useAuth()
+  const { role, hasPermission } = useAuth()
   const [unreadCount, setUnreadCount] = useState(0)
   const [showMore, setShowMore] = useState(false)
 
@@ -20,10 +20,10 @@ export default function BottomNav() {
 
   const mainNav = [
     { label: 'Home', icon: '⚡', path: '/dashboard' },
-    { label: 'Rooms', icon: '🏠', path: '/rooms' },
-    { label: 'Tenants', icon: '👥', path: '/tenants' },
-    { label: 'Payments', icon: '💰', path: '/payments' },
-  ]
+    { label: 'Rooms', icon: '🏠', path: '/rooms', permKey: 'rooms_view' },
+    { label: 'Tenants', icon: '👥', path: '/tenants', permKey: 'tenants_view' },
+    { label: 'Payments', icon: '💰', path: '/payments', permKey: 'payments_view' },
+  ].filter(item => !item.permKey || hasPermission(item.permKey))
 
   const adminExtra = [
     { label: 'Expenses', icon: '🧾', path: '/expenses' },
@@ -32,13 +32,14 @@ export default function BottomNav() {
     { label: 'Assets', icon: '📦', path: '/assets' },
     { label: 'Notifs', icon: '🔔', path: '/notifications' },
     { label: 'Deletes', icon: '🗑️', path: '/delete-requests' },
+    { label: 'Access', icon: '🔐', path: '/access-control' },
     { label: 'Settings', icon: '⚙️', path: '/settings' },
   ]
 
   const wardenExtra = [
-    { label: 'Expenses', icon: '🧾', path: '/expenses' },
-    { label: 'Notifs', icon: '🔔', path: '/notifications' },
-  ]
+    { label: 'Expenses', icon: '🧾', path: '/expenses', permKey: 'expenses_view' },
+    { label: 'Notifs', icon: '🔔', path: '/notifications', permKey: 'notifications_view' },
+  ].filter(item => !item.permKey || hasPermission(item.permKey))
 
   const extraItems = role === 'admin' ? adminExtra : wardenExtra
 

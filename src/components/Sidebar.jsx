@@ -8,22 +8,22 @@ import pgConfig from '../config/pgConfig'
 
 const allNavItems = [
   { label: 'Dashboard', icon: '⚡', path: '/dashboard', adminOnly: false },
-  { label: 'Rooms', icon: '🏠', path: '/rooms', adminOnly: false },
-  { label: 'Tenants', icon: '👥', path: '/tenants', adminOnly: false },
+  { label: 'Rooms', icon: '🏠', path: '/rooms', adminOnly: false, permKey: 'rooms_view' },
+  { label: 'Tenants', icon: '👥', path: '/tenants', adminOnly: false, permKey: 'tenants_view' },
   { label: 'Bookings', icon: '📋', path: '/bookings', adminOnly: false },
-  { label: 'Payments', icon: '💰', path: '/payments', adminOnly: false },
-  { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: false },
+  { label: 'Payments', icon: '💰', path: '/payments', adminOnly: false, permKey: 'payments_view' },
+  { label: 'Expenses', icon: '🧾', path: '/expenses', adminOnly: false, permKey: 'expenses_view' },
   { label: 'Staff', icon: '👷', path: '/staff', adminOnly: true },
   { label: 'Reports', icon: '📊', path: '/reports', adminOnly: true },
   { label: 'Assets', icon: '📦', path: '/assets', adminOnly: true },
-  { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false, badge: true },
+  { label: 'Notifications', icon: '🔔', path: '/notifications', adminOnly: false, permKey: 'notifications_view', badge: true },
   { label: 'Delete Requests', icon: '🗑️', path: '/delete-requests', adminOnly: true },
   { label: 'Access Control', icon: '🔐', path: '/access-control', adminOnly: true },
   { label: 'Settings', icon: '⚙️', path: '/settings', adminOnly: true },
 ]
 
 export default function Sidebar() {
-  const { role } = useAuth()
+  const { role, hasPermission } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [unreadCount, setUnreadCount] = useState(0)
@@ -44,7 +44,11 @@ export default function Sidebar() {
     navigate('/login')
   }
 
-  const navItems = allNavItems.filter(item => !item.adminOnly || role === 'admin')
+  const navItems = allNavItems.filter(item => {
+    if (item.adminOnly && role !== 'admin') return false
+    if (item.permKey && !hasPermission(item.permKey)) return false
+    return true
+  })
 
   const getBadge = (item) => {
     if (item.path === '/notifications' && unreadCount > 0) return unreadCount
