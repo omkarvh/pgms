@@ -118,7 +118,7 @@ const generateAdmissionPDF = (bill, pgConfig) => {
   w.onload = () => { w.print() }
 }
 
-const sendAdmissionWhatsApp = (bill, pgConfig) => {
+const sendAdmissionWhatsApp = async (bill, pgConfig) => {
   const phone = bill.phone?.replace(/\D/g, '')
   if (!phone) return alert('Phone number not found')
   const phoneWithCode = phone.startsWith('91') ? phone : `91${phone}`
@@ -148,7 +148,7 @@ const sendAdmissionWhatsApp = (bill, pgConfig) => {
   ].filter(Boolean).join('\n')
 
   const nextMonthDue = bill.rentMode === 'monthly' ? `3rd ${nextMonthName}` : ''
-  const billLink = getBillLink({
+  const billLink = await getBillLink({
     tenantName: bill.name, roomNumber: bill.roomNumber, date: bill.joinDate,
     amount: bill.firstMonthRent, mode: bill.paymentMode || 'cash', advance: bill.advance,
     nextMonthAmount: bill.rentMode === 'monthly' ? bill.monthlyRate : 0, nextMonthDue,
@@ -160,7 +160,7 @@ const sendAdmissionWhatsApp = (bill, pgConfig) => {
   window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(fullMsg)}`, '_blank')
 }
 
-const copyAdmissionBillLink = (bill, pgConfig) => {
+const copyAdmissionBillLink = async (bill, pgConfig) => {
   const joinDate = new Date(bill.joinDate)
   const nextMonth = new Date(joinDate.getFullYear(), joinDate.getMonth() + 1, 1)
   const nextMonthDue = bill.rentMode === 'monthly' ? `3rd ${nextMonth.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}` : ''

@@ -51,6 +51,7 @@ function App() {
     <HashRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path="/bill/:id" element={<PublicBill />} />
           <Route path="/bill" element={<PublicBill />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

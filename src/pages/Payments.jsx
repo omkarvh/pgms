@@ -97,12 +97,12 @@ const generateBillText = (payment, tenant, pgConfig) => {
   ].filter(Boolean).join('\n')
 }
 
-const sendBillOnWhatsApp = (payment, tenant, pgConfig) => {
+const sendBillOnWhatsApp = async (payment, tenant, pgConfig) => {
   const phone = tenant?.phone?.replace(/\D/g, '')
   if (!phone) return alert('Tenant phone number not found')
   const phoneWithCode = phone.startsWith('91') ? phone : `91${phone}`
 
-  const billLink = getBillLink({
+  const billLink = await getBillLink({
     tenantName: payment.tenantName, roomNumber: payment.roomNumber,
     date: payment.date, month: payment.month, amount: payment.amount,
     mode: payment.mode, currency: pgConfig.currency, pgName: pgConfig.pg_name,

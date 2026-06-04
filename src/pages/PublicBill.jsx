@@ -1,23 +1,25 @@
-import { useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useSearchParams, useParams } from 'react-router-dom'
+import { db } from '../firebase/config'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 
-// Short keys to minimize URL length
+// Generate short 6-char ID
+const shortId = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  let id = ''
+  for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)]
+  return id
+}
+
+// Unicode-safe base64 (fallback for old links)
+const atou = (str) => { try { return decodeURIComponent(escape(atob(str))) } catch { return null } }
+
 const KEY_MAP = {
   n: 'tenantName', r: 'roomNumber', d: 'date', m: 'month',
   a: 'amount', md: 'mode', nt: 'note', c: 'currency',
   pg: 'pgName', l: 'location', ct: 'contact', u: 'upiId',
   rc: 'receiptNo', bt: 'billType', adv: 'advance',
   pr: 'proRateNote', nm: 'nextMonthAmount', nd: 'nextMonthDue'
-}
-const REV_MAP = Object.fromEntries(Object.entries(KEY_MAP).map(([k, v]) => [v, k]))
-
-const compress = (data) => {
-  const short = {}
-  for (const [key, val] of Object.entries(data)) {
-    if (val === '' || val === null || val === undefined || val === 0) continue
-    short[REV_MAP[key] || key] = val
-  }
-  return short
 }
 
 const expand = (short) => {
@@ -28,23 +30,34 @@ const expand = (short) => {
   return full
 }
 
-// Unicode-safe base64
-const utoa = (str) => btoa(unescape(encodeURIComponent(str)))
-const atou = (str) => decodeURIComponent(escape(atob(str)))
-
-const decode = (str) => {
-  try { return expand(JSON.parse(atou(str))) }
-  catch { return null }
+const compress = (data) => {
+  const REV_MAP = Object.fromEntries(Object.entries(KEY_MAP).map(([k, v]) => [v, k]))
+  const short = {}
+  for (const [key, val] of Object.entries(data)) {
+    if (val === '' || val === null || val === undefined || val === 0) continue
+    short[REV_MAP[key] || key] = val
+  }
+  return short
 }
 
-export function getBillLink(data) {
-  const encoded = utoa(JSON.stringify(compress(data)))
+// Save bill to Firestore and return short link
+export async function getBillLink(data) {
+  const id = shortId()
+  try {
+    await setDoc(doc(db, 'bills', id), compress(data))
+  } catch {
+    // If Firestore fails, fall back to base64
+    const utoa = (str) => btoa(unescape(encodeURIComponent(str)))
+    const encoded = utoa(JSON.stringify(compress(data)))
+    const base = window.location.origin + window.location.pathname
+    return `${base}#/bill?d=${encoded}`
+  }
   const base = window.location.origin + window.location.pathname
-  return `${base}#/bill?d=${encoded}`
+  return `${base}#/bill/${id}`
 }
 
-export function copyBillLink(data) {
-  const link = getBillLink(data)
+export async function copyBillLink(data) {
+  const link = await getBillLink(data)
   navigator.clipboard.writeText(link).then(() => alert('Bill link copied!')).catch(() => {
     prompt('Copy this link:', link)
   })
@@ -52,8 +65,44 @@ export function copyBillLink(data) {
 }
 
 export default function PublicBill() {
+  const { id } = useParams()
   const [params] = useSearchParams()
-  const bill = useMemo(() => decode(params.get('d')), [params])
+  const [bill, setBill] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      // Try short ID from Firestore
+      if (id) {
+        try {
+          const snap = await getDoc(doc(db, 'bills', id))
+          if (snap.exists()) {
+            setBill(expand(snap.data()))
+            setLoading(false)
+            return
+          }
+        } catch {}
+      }
+      // Fallback: base64 from query param
+      const d = params.get('d')
+      if (d) {
+        const raw = atou(d)
+        if (raw) {
+          try {
+            setBill(expand(JSON.parse(raw)))
+          } catch {}
+        }
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id, params])
+
+  if (loading) return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  )
 
   if (!bill) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">
