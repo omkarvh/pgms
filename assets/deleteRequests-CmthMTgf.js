@@ -1,0 +1,1 @@
+import{_ as e,c as t,r as n,y as r}from"./jsx-runtime-pGm8juHe.js";async function i(i,a,o){await t(e(n,`deleteRequests`),{collectionName:i,docId:a,label:o,status:`pending`,createdAt:r()}),alert(`Delete request sent to admin for "${o}"`)}export{i as t};
