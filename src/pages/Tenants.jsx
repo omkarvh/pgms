@@ -275,6 +275,23 @@ export default function Tenants() {
     setShowModal(true);
   };
 
+  const openReadmit = (tenant) => {
+    setEditTenant(null);
+    setFormRaw({
+      name: tenant.name, phone: tenant.phone, email: tenant.email || "",
+      roomId: "", roomNumber: "",
+      rentMode: tenant.rentMode, joinDate: new Date().toISOString().slice(0, 10),
+      idType: tenant.idType || "", idNumber: tenant.idNumber || "",
+      advance: "", emergencyContact: tenant.emergencyContact || "",
+      address: tenant.address || "",
+      notes: tenant.notes ? tenant.notes + `\nRe-admitted (prev Room ${tenant.roomNumber})` : `Re-admitted (prev Room ${tenant.roomNumber})`,
+      firstMonthRent: "", firstMonthMode: "cash",
+      idPhoto: null, tenantPhoto: null
+    });
+    setShowModal(true);
+    setExpandedId(null);
+  };
+
   const calcFirstMonthRent = (roomId, joinDate, rentMode) => {
     if (!roomId || !joinDate || rentMode === 'daily') { setRentCalc(null); return null }
     const room = rooms.find(r => r.id === roomId)
@@ -676,6 +693,12 @@ export default function Tenants() {
                       Checkout
                     </button>
                   </>
+                )}
+                {tab === "left" && (
+                  <button onClick={() => openReadmit(tenant)}
+                    className="flex-1 bg-green-500/20 hover:bg-green-500/30 text-green-400 text-xs py-2 rounded-lg transition-all font-semibold">
+                    Re-admit
+                  </button>
                 )}
                 {role === "admin" && (
                   <button onClick={() => openPurge(tenant)}
