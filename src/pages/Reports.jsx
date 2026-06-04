@@ -4,9 +4,10 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 
 export default function Reports() {
+  const pgConfig = usePgConfig()
   const [payments, setPayments] = useState([])
   const [expenses, setExpenses] = useState([])
   const [tenants, setTenants] = useState([])

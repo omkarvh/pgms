@@ -26,6 +26,7 @@ export default function BottomNav() {
   ].filter(item => !item.permKey || hasPermission(item.permKey))
 
   const adminExtra = [
+    { label: 'Bookings', icon: '📋', path: '/bookings' },
     { label: 'Expenses', icon: '🧾', path: '/expenses' },
     { label: 'Staff', icon: '👷', path: '/staff' },
     { label: 'Reports', icon: '📊', path: '/reports' },
@@ -37,6 +38,7 @@ export default function BottomNav() {
   ]
 
   const wardenExtra = [
+    { label: 'Bookings', icon: '📋', path: '/bookings' },
     { label: 'Expenses', icon: '🧾', path: '/expenses', permKey: 'expenses_view' },
     { label: 'Notifs', icon: '🔔', path: '/notifications', permKey: 'notifications_view' },
   ].filter(item => !item.permKey || hasPermission(item.permKey))

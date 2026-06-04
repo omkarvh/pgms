@@ -4,13 +4,14 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 
 const COLORS = ['#6366f1', '#f87171', '#34d399', '#fbbf24', '#a78bfa', '#fb923c', '#38bdf8', '#f472b6']
 
 const typeCapacity = { single: 1, double: 2, triple: 3, dormitory: 6 }
 
 export default function Analytics() {
+  const pgConfig = usePgConfig()
   const [payments, setPayments] = useState([])
   const [expenses, setExpenses] = useState([])
   const [tenants, setTenants] = useState([])

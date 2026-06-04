@@ -3,9 +3,10 @@ import { auth, googleProvider } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 
 export default function Login() {
+  const pgConfig = usePgConfig()
   const navigate = useNavigate()
   const { user, role, loading } = useAuth()
   const [error, setError] = useState('')

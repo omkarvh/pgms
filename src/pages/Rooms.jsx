@@ -3,7 +3,7 @@ import { db } from '../firebase/config'
 import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 import { sendNotification } from '../firebase/notifications'
 import { useAuth } from '../context/AuthContext'
 
@@ -61,6 +61,7 @@ function CapacityBar({ occupied, capacity }) {
 }
 
 export default function Rooms() {
+  const pgConfig = usePgConfig()
   const { role } = useAuth()
   const [rooms, setRooms] = useState([])
   const [showModal, setShowModal] = useState(false)

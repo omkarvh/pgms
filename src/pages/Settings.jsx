@@ -1,23 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth } from '../firebase/config'
 import { useNavigate } from 'react-router-dom'
 import { useAuthState } from 'react-firebase-hooks/auth'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig, savePgConfig } from '../context/PgConfigContext'
 
 export default function Settings() {
   const [user] = useAuthState(auth)
   const navigate = useNavigate()
+  const pgConfig = usePgConfig()
   const [config, setConfig] = useState({ ...pgConfig })
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const handleSave = () => {
-    // In a real deployment this would update Firestore
-    // For now it updates the local state and shows confirmation
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  useEffect(() => {
+    setConfig({ ...pgConfig })
+  }, [pgConfig])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await savePgConfig(config)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      alert('Error saving: ' + err.message)
+    }
+    setSaving(false)
   }
 
   const handleLogout = async () => {
@@ -90,9 +101,9 @@ export default function Settings() {
             </div>
           </div>
 
-          <button onClick={handleSave}
-            className={`w-full mt-4 py-2.5 rounded-xl font-bold text-sm transition-all ${saved ? 'bg-green-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
-            {saved ? '✓ Saved!' : 'Save Changes'}
+          <button onClick={handleSave} disabled={saving}
+            className={`w-full mt-4 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${saved ? 'bg-green-500 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}>
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Changes'}
           </button>
         </div>
 

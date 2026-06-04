@@ -3,7 +3,7 @@ import { db } from '../firebase/config'
 import { collection, addDoc, onSnapshot, deleteDoc, doc } from 'firebase/firestore'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 import { useAuth } from '../context/AuthContext'
 import { requestDelete } from '../firebase/deleteRequests'
 import { sendNotification } from '../firebase/notifications'
@@ -23,11 +23,15 @@ const categoryColors = {
 }
 
 export default function Expenses() {
+  const pgConfig = usePgConfig()
   const [expenses, setExpenses] = useState([])
   const { role } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [filter, setFilter] = useState('all')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterTo, setFilterTo] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [form, setForm] = useState({
     category: 'Groceries',
     amount: '',
@@ -83,19 +87,30 @@ export default function Expenses() {
     setUploading(false)
   }
 
-  const handleDelete = async (expense) => {
+  const handleDelete = (expense) => {
     if (role === 'admin') {
-      if (window.confirm('Delete this expense?')) await deleteDoc(doc(db, 'expenses', expense.id))
+      setDeleteTarget(expense)
     } else {
-      await requestDelete('expenses', expense.id, `${expense.category} - ${pgConfig.currency}${expense.amount}`)
+      requestDelete('expenses', expense.id, `${expense.category} - ${pgConfig.currency}${expense.amount}`)
     }
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    await deleteDoc(doc(db, 'expenses', deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   const thisMonth = new Date().toISOString().slice(0, 7)
   const thisMonthExpenses = expenses.filter(e => e.date?.startsWith(thisMonth))
   const totalThisMonth = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0)
   const totalAll = expenses.reduce((sum, e) => sum + e.amount, 0)
-  const filtered = filter === 'all' ? expenses : thisMonthExpenses
+  const filtered = (() => {
+    let list = filter === 'month' ? thisMonthExpenses : expenses
+    if (filterFrom) list = list.filter(e => e.date >= filterFrom)
+    if (filterTo) list = list.filter(e => e.date <= filterTo)
+    return list
+  })()
 
   const breakdown = categories.map(cat => ({
     cat,
@@ -170,20 +185,38 @@ export default function Expenses() {
           </div>
         )}
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
           <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
+            onClick={() => { setFilter('all'); setFilterFrom(''); setFilterTo('') }}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'all' && !filterFrom && !filterTo ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
           >
             All
           </button>
           <button
-            onClick={() => setFilter('month')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'month' ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
+            onClick={() => { setFilter('month'); setFilterFrom(''); setFilterTo('') }}
+            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${filter === 'month' && !filterFrom && !filterTo ? 'bg-indigo-500 text-white' : 'bg-gray-900 text-gray-500 border border-gray-800'}`}
           >
             This Month
           </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+              className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 w-[130px]" />
+            <span className="text-gray-600 text-xs">to</span>
+            <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+              className="bg-gray-900 border border-gray-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 w-[130px]" />
+            {(filterFrom || filterTo) && (
+              <button onClick={() => { setFilterFrom(''); setFilterTo('') }}
+                className="text-gray-600 hover:text-red-400 text-xs transition-all">Clear</button>
+            )}
+          </div>
         </div>
+        {(filterFrom || filterTo) && (
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-gray-500 text-xs font-mono">
+              {filtered.length} expense{filtered.length !== 1 ? 's' : ''} · {pgConfig.currency}{filtered.reduce((s, e) => s + e.amount, 0).toLocaleString()}
+            </p>
+          </div>
+        )}
 
         {filtered.length === 0 ? (
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
@@ -286,6 +319,27 @@ export default function Expenses() {
               >
                 {uploading ? 'Uploading...' : 'Save Expense'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm text-center">
+            <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl text-red-400 font-black">!</span>
+            </div>
+            <h3 className="text-lg font-bold mb-1">Delete Expense?</h3>
+            <p className="text-gray-400 text-sm mb-1">{deleteTarget.category} — {pgConfig.currency}{deleteTarget.amount.toLocaleString()}</p>
+            <p className="text-gray-600 text-xs mb-1">{deleteTarget.date}</p>
+            {deleteTarget.note && <p className="text-gray-600 text-xs mb-1">{deleteTarget.note}</p>}
+            <p className="text-red-400/70 text-xs mt-3 mb-4">This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2.5 rounded-xl transition-all">No, Keep</button>
+              <button onClick={confirmDelete}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-sm font-bold py-2.5 rounded-xl transition-all">Yes, Delete</button>
             </div>
           </div>
         </div>

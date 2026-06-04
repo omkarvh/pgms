@@ -3,7 +3,7 @@ import { db } from '../firebase/config'
 import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore'
 import Sidebar from '../components/Sidebar'
 import BottomNav from '../components/BottomNav'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 import { uploadFile } from '../firebase/uploadFile'
 
 const avatarColors = [
@@ -16,6 +16,7 @@ const avatarColors = [
 const getAvatarColor = (name) => avatarColors[name?.charCodeAt(0) % avatarColors.length] || avatarColors[0]
 
 export default function Staff() {
+  const pgConfig = usePgConfig()
   const [staff, setStaff] = useState([])
   const [salaries, setSalaries] = useState([])
   const [showStaffModal, setShowStaffModal] = useState(false)

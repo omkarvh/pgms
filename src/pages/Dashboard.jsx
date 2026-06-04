@@ -4,7 +4,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import BottomNav from "../components/BottomNav";
-import pgConfig from "../config/pgConfig";
+import { usePgConfig } from "../context/PgConfigContext";
 import { useAuth } from "../context/AuthContext";
 import { checkRentDues } from '../firebase/notifications'
 
@@ -62,6 +62,7 @@ function DuesTracking({ tenants, payments }) {
 }
 
 export default function Dashboard() {
+  const pgConfig = usePgConfig()
   const [rooms, setRooms] = useState([]);
   const [tenants, setTenants] = useState([]);
   const [payments, setPayments] = useState([]);

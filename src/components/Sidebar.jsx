@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useEffect, useState } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
-import pgConfig from '../config/pgConfig'
+import { usePgConfig } from '../context/PgConfigContext'
 
 const allNavItems = [
   { label: 'Dashboard', icon: '⚡', path: '/dashboard', adminOnly: false },
@@ -24,6 +24,7 @@ const allNavItems = [
 ]
 
 export default function Sidebar() {
+  const pgConfig = usePgConfig()
   const { role, hasPermission } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
