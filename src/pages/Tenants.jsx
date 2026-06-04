@@ -968,15 +968,24 @@ export default function Tenants() {
             <h3 className="text-lg font-bold mb-1">Switch Room</h3>
             <p className="text-gray-400 text-sm mb-4">{switchTarget.name} — currently in Room {switchTarget.roomNumber}</p>
 
+            {/* Rent mode badge */}
+            <div className={`inline-block text-xs font-mono px-2 py-0.5 rounded-full mb-4 ${switchTarget.rentMode === 'daily' ? 'bg-orange-500/20 text-orange-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+              {switchTarget.rentMode === 'daily' ? 'Daily Rate Tenant' : 'Monthly Tenant'}
+            </div>
+
             {/* Current room info */}
             {(() => {
               const currentRoom = rooms.find(r => r.id === switchTarget.roomId)
+              const isDaily = switchTarget.rentMode === 'daily'
               return currentRoom ? (
                 <div className="bg-gray-800 rounded-xl p-3 mb-4">
                   <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Current Room</p>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Room {currentRoom.number} · {currentRoom.type}</span>
-                    <span className="text-white font-bold">{pgConfig.currency}{currentRoom.monthlyRate}/mo</span>
+                    {isDaily
+                      ? <span className="text-white font-bold">{pgConfig.currency}{currentRoom.dailyRate || '—'}/day</span>
+                      : <span className="text-white font-bold">{pgConfig.currency}{currentRoom.monthlyRate}/mo</span>
+                    }
                   </div>
                 </div>
               ) : null
@@ -991,17 +1000,18 @@ export default function Tenants() {
                 {switchableRooms.map(r => {
                   const capacity = r.capacity || typeCapacity[r.type] || 1
                   const free = capacity - (r.occupiedBeds || 0)
+                  const isDaily = switchTarget.rentMode === 'daily'
                   return (
                     <option key={r.id} value={r.id}>
-                      Room {r.number} · {r.type} · {free} bed{free !== 1 ? 's' : ''} free · {pgConfig.currency}{r.monthlyRate}/mo
+                      Room {r.number} · {r.type} · {free} bed{free !== 1 ? 's' : ''} free{isDaily ? '' : ` · ${pgConfig.currency}${r.monthlyRate}/mo`}
                     </option>
                   )
                 })}
               </select>
             </div>
 
-            {/* Rate comparison */}
-            {switchRoomId && (() => {
+            {/* Rate comparison - only for monthly tenants */}
+            {switchRoomId && switchTarget.rentMode !== 'daily' && (() => {
               const currentRoom = rooms.find(r => r.id === switchTarget.roomId)
               const newRoom = rooms.find(r => r.id === switchRoomId)
               if (!currentRoom || !newRoom) return null
@@ -1022,6 +1032,15 @@ export default function Tenants() {
                     <span>{diff > 0 ? 'Increase' : diff < 0 ? 'Savings' : 'No change'}</span>
                     <span>{diff > 0 ? '+' : ''}{pgConfig.currency}{diff.toLocaleString('en-IN')}/mo</span>
                   </div>
+                </div>
+              )
+            })()}
+
+            {/* Info for daily tenants */}
+            {switchRoomId && switchTarget.rentMode === 'daily' && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-3 mb-4 text-orange-400 text-xs font-mono">
+                Daily rate tenant — charges are set manually per stay, not affected by room monthly rate.
+              </div>
                 </div>
               )
             })()}
