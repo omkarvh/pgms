@@ -1041,9 +1041,7 @@ export default function Tenants() {
               <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-3 mb-4 text-orange-400 text-xs font-mono">
                 Daily rate tenant — charges are set manually per stay, not affected by room monthly rate.
               </div>
-                </div>
-              )
-            })()}
+            )}
 
             {switchableRooms.length === 0 && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-xs font-mono text-center">
