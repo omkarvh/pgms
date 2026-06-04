@@ -64,6 +64,7 @@ export default function Rooms() {
   const pgConfig = usePgConfig()
   const { role } = useAuth()
   const [rooms, setRooms] = useState([])
+  const [tenants, setTenants] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editRoom, setEditRoom] = useState(null)
   const [error, setError] = useState('')
@@ -73,10 +74,13 @@ export default function Rooms() {
   })
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'rooms'), (snap) => {
+    const unsub1 = onSnapshot(collection(db, 'rooms'), (snap) => {
       setRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
-    return unsub
+    const unsub2 = onSnapshot(collection(db, 'tenants'), (snap) => {
+      setTenants(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(t => t.status === 'active'))
+    })
+    return () => { unsub1(); unsub2() }
   }, [])
 
   const openAdd = () => {
@@ -234,6 +238,20 @@ export default function Rooms() {
 
                   {/* CAPACITY BAR */}
                   <CapacityBar occupied={occupied} capacity={capacity} />
+
+                  {/* TENANT NAMES */}
+                  {(() => {
+                    const roomTenants = tenants.filter(t => t.roomId === room.id)
+                    return roomTenants.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {roomTenants.map(t => (
+                          <span key={t.id} className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded-md font-mono truncate max-w-[90px]" title={t.name}>
+                            {t.name.split(' ')[0]}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null
+                  })()}
 
                   {room.amenities && <p className="text-xs opacity-50 mt-2 truncate">{room.amenities}</p>}
 
