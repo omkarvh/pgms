@@ -211,6 +211,9 @@ export default function Tenants() {
   const [purgeTarget, setPurgeTarget] = useState(null);
   const [purgeInfo, setPurgeInfo] = useState(null);
   const [purging, setPurging] = useState(false);
+  const [switchTarget, setSwitchTarget] = useState(null);
+  const [switchRoomId, setSwitchRoomId] = useState('');
+  const [switching, setSwitching] = useState(false);
 
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterRoomType, setFilterRoomType] = useState("all");
@@ -466,6 +469,62 @@ export default function Tenants() {
     setPurging(false)
   }
 
+  const switchableRooms = switchTarget ? rooms.filter(r => {
+    if (r.id === switchTarget.roomId) return false
+    if (r.status === 'maintenance') return false
+    const capacity = r.capacity || typeCapacity[r.type] || 1
+    const occupied = r.occupiedBeds || 0
+    return occupied < capacity
+  }) : []
+
+  const handleSwitch = async () => {
+    if (!switchTarget || !switchRoomId) return
+    setSwitching(true)
+    try {
+      const newRoom = rooms.find(r => r.id === switchRoomId)
+      if (!newRoom) throw new Error('Room not found')
+      const oldRoomId = switchTarget.roomId
+
+      // Update tenant record
+      await updateDoc(doc(db, "tenants", switchTarget.id), {
+        roomId: switchRoomId,
+        roomNumber: newRoom.number,
+        notes: (switchTarget.notes || '') + `\nSwitched from Room ${switchTarget.roomNumber} to Room ${newRoom.number} on ${new Date().toISOString().slice(0, 10)}`
+      })
+
+      // Decrease old room occupancy
+      const oldSnap = await getDoc(doc(db, "rooms", oldRoomId))
+      if (oldSnap.exists()) {
+        const oldData = oldSnap.data()
+        const newOccupied = Math.max((oldData.occupiedBeds || 1) - 1, 0)
+        await updateDoc(doc(db, "rooms", oldRoomId), {
+          occupiedBeds: newOccupied,
+          status: newOccupied === 0 ? 'vacant' : 'occupied'
+        })
+      }
+
+      // Increase new room occupancy
+      const newSnap = await getDoc(doc(db, "rooms", switchRoomId))
+      if (newSnap.exists()) {
+        const newData = newSnap.data()
+        const newOccupied = (newData.occupiedBeds || 0) + 1
+        await updateDoc(doc(db, "rooms", switchRoomId), {
+          occupiedBeds: newOccupied,
+          status: 'occupied'
+        })
+      }
+
+      await sendNotification("info", "Room Switch", `${switchTarget.name} switched from Room ${switchTarget.roomNumber} to Room ${newRoom.number}`)
+
+      setSwitchTarget(null)
+      setSwitchRoomId('')
+      setExpandedId(null)
+    } catch (err) {
+      alert('Error switching room: ' + err.message)
+    }
+    setSwitching(false)
+  }
+
   const getDaysStayed = (tenant) => {
     const start = new Date(tenant.joinDate)
     const end = tenant.leftDate ? new Date(tenant.leftDate) : new Date()
@@ -608,6 +667,10 @@ export default function Tenants() {
                         Request Edit
                       </button>
                     )}
+                    <button onClick={() => { setSwitchTarget(tenant); setSwitchRoomId('') }}
+                      className="flex-1 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-xs py-2 rounded-lg transition-all font-semibold">
+                      Switch Room
+                    </button>
                     <button onClick={() => handleCheckout(tenant)}
                       className="flex-1 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-xs py-2 rounded-lg transition-all font-semibold">
                       Checkout
@@ -894,6 +957,88 @@ export default function Tenants() {
                 className="flex-1 bg-green-600 hover:bg-green-700 text-sm font-bold py-2.5 rounded-xl transition-all">WhatsApp</button>
               <button onClick={() => copyAdmissionBillLink(admissionBill, pgConfig)}
                 className="flex-1 bg-cyan-500 hover:bg-cyan-600 text-sm font-bold py-2.5 rounded-xl transition-all">Link</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {switchTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-1">Switch Room</h3>
+            <p className="text-gray-400 text-sm mb-4">{switchTarget.name} — currently in Room {switchTarget.roomNumber}</p>
+
+            {/* Current room info */}
+            {(() => {
+              const currentRoom = rooms.find(r => r.id === switchTarget.roomId)
+              return currentRoom ? (
+                <div className="bg-gray-800 rounded-xl p-3 mb-4">
+                  <p className="text-xs font-mono text-gray-500 uppercase tracking-widest mb-2">Current Room</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Room {currentRoom.number} · {currentRoom.type}</span>
+                    <span className="text-white font-bold">{pgConfig.currency}{currentRoom.monthlyRate}/mo</span>
+                  </div>
+                </div>
+              ) : null
+            })()}
+
+            {/* New room selection */}
+            <div className="mb-4">
+              <label className="text-xs text-gray-500 font-mono mb-1 block">Select New Room *</label>
+              <select value={switchRoomId} onChange={e => setSwitchRoomId(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500">
+                <option value="">Choose a room...</option>
+                {switchableRooms.map(r => {
+                  const capacity = r.capacity || typeCapacity[r.type] || 1
+                  const free = capacity - (r.occupiedBeds || 0)
+                  return (
+                    <option key={r.id} value={r.id}>
+                      Room {r.number} · {r.type} · {free} bed{free !== 1 ? 's' : ''} free · {pgConfig.currency}{r.monthlyRate}/mo
+                    </option>
+                  )
+                })}
+              </select>
+            </div>
+
+            {/* Rate comparison */}
+            {switchRoomId && (() => {
+              const currentRoom = rooms.find(r => r.id === switchTarget.roomId)
+              const newRoom = rooms.find(r => r.id === switchRoomId)
+              if (!currentRoom || !newRoom) return null
+              const oldRate = Number(currentRoom.monthlyRate) || 0
+              const newRate = Number(newRoom.monthlyRate) || 0
+              const diff = newRate - oldRate
+              return (
+                <div className={`rounded-xl p-3 mb-4 border text-xs font-mono ${diff > 0 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' : diff < 0 ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-gray-800 border-gray-700 text-gray-400'}`}>
+                  <div className="flex justify-between mb-1">
+                    <span>Room {currentRoom.number} ({currentRoom.type})</span>
+                    <span>{pgConfig.currency}{oldRate.toLocaleString('en-IN')}/mo</span>
+                  </div>
+                  <div className="flex justify-between mb-1">
+                    <span>Room {newRoom.number} ({newRoom.type})</span>
+                    <span>{pgConfig.currency}{newRate.toLocaleString('en-IN')}/mo</span>
+                  </div>
+                  <div className="flex justify-between font-bold pt-1 border-t border-current/20">
+                    <span>{diff > 0 ? 'Increase' : diff < 0 ? 'Savings' : 'No change'}</span>
+                    <span>{diff > 0 ? '+' : ''}{pgConfig.currency}{diff.toLocaleString('en-IN')}/mo</span>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {switchableRooms.length === 0 && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-xs font-mono text-center">
+                No available rooms to switch to.
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => { setSwitchTarget(null); setSwitchRoomId('') }}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-sm py-2.5 rounded-xl transition-all">Cancel</button>
+              <button onClick={handleSwitch} disabled={!switchRoomId || switching}
+                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-sm font-bold py-2.5 rounded-xl transition-all disabled:opacity-50">
+                {switching ? 'Switching...' : 'Confirm Switch'}
+              </button>
             </div>
           </div>
         </div>
