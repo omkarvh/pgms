@@ -1,0 +1,1 @@
+import{a as e,b as t,u as n,v as r}from"./index-DX96c6Q1.js";async function i(i,a,o){await n(r(e,`deleteRequests`),{collectionName:i,docId:a,label:o,status:`pending`,createdAt:t()}),alert(`Delete request sent to admin for "${o}"`)}export{i as t};
